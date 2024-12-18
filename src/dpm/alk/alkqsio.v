@@ -45,13 +45,13 @@ module alkqsio(
 	output q_sout_shl_h,
 	output q_sout_shr_h,
 	
-	/* Shift inputs */
+	/* Q_SIO[] pad inputs */
 	input  q_sio0_in_l,
 	input  q_sio7_in_l,
 	input  q_sio15_in_l,
 	input  q_sio31_in_l,
 	
-	/* Shift outputs ( open drain ) */
+	/* Q_SIO[] pad outputs ( open drain, 1 means pull down ) */
 	output q_sio0_out_l,
 	output q_sio7_out_l,
 	output q_sio15_out_l,
