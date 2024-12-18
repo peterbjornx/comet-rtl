@@ -1,0 +1,1149 @@
+.TOC "DEFIN.MIC"
+.TOC "REVISION 67.0"
+;    Jeff Peng, P. R. GUILBAULT
+
+.NOBIN
+.ULINE
+.RTOL
+.HEXADECIMAL
+.SOURCE/35
+.TITLE  "CLOKX Rev @@@@@, Clock rate = ???ns"
+.SET/INIT=0             ;SWITCH THAT INDICATES INIT_U-CODE FOR VALIDITY CHECK
+.WIDTH/81
+.NOCREF                 ;SET UP FOR CREF ONLY WHEN FULL ASSEMBLY
+.FILLERPAGE
+.BOUNDS/ROW 1:0000,03FF/ROW 2:0400,07FF/ROW 3:0800,0BFF
+.BOUNDS/ROW 4:0C00,0FFF/ROW 5:1000,13FF/ROW 6:1400,17FF
+.BOUNDS/WCS:2000,23FF/PCS:2800,2BFF
+
+.TOC    "       Revision History"
+; 67    Add a VALIDITY check V025 to verify the hardware conflict of "MSRC/TEMP4" and "BUS/PROBE.WR".
+;         and correct some error comments.
+; 66    Increase the width of u-word by one; Add a PATCH field in bit #80; Move the VSIZE field to bit #84.
+; 65    ADD BRANCH ON FPA PRESENT
+; 64    Initial release.
+.TOC "  Comet Micro Word Chart"
+
+;
+;                                    +---------------------------------------------------------------+
+;                                    |                                                               |
+;                                    |                                             +-----------------+
+;                                    |                      LONLIT                 |                 |
+;                                    |                                             |      LITRL      |
+;                                    |                                             |                 |
+;      +-------------+---------------+---------------------------------------------+-----------+-+---+---------------------+
+;      |      2      |                                      1                                  |2| 1 |           2         |
+;+-+-+-+---+---------+---+---------+-----------+-------------------+-----------+---+-----------+-+---+-----------+---------+
+;|P| | |   |         |   |         |           |                   |           | D |           |I|   |           |         |
+;|A|P|P|   |         |   |         |           |                   |           | T |           |S|   |           |         |
+;|T|A|A|LIT|   MISC  |SPW|   MSRC  |    ROT    |       ALPCTL      |    BUT    | Y |    RSRC   |T| C |   WCTRL   |   BUS   |
+;|C|R|R|   |         |   |         |           |                   |           | P |           |R| C |           |         |
+;|H|2|1|   |         |   |         |           |                   |           | E |           |M|   |           |         |
+;+-+-+-+---+---------+---+---------+-----------+-------------------+-----------+---+-----------+-+---+-----------+---------+
+;|8|7|7|7 7|7 7 7 7 7|7 6|6 6 6 6 6|6 6 6 6 5 5|5 5 5 5 5 5 5 5 4 4|4 4 4 4 4 4|4 4|3 3 3 3 3 3|3|3 3|3 2 2 2 2 2|2 2 2 2 2|
+;|0|9|8|7 6|5 4 3 2 1|0 9|8 7 6 5 4|3 2 1 0 9 8|7 6 5 4 3 2 1 0 9 8|7 6 5 4 3 2|1 0|9 8 7 6 5 4|3|2 1|0 9 8 7 6 5|4 3 2 1 0|
+;+-+-+-+---+---------+---+---------+-+-----+---+-------+-------+---+-----------+---+-----------+-+---+-----------+---------+
+;                                  | |     |   |       |       |   |                             |               |
+;                                  |A|  A  | A |  MUX  |  ALU  |DQ1|                             |     CCMISC    |
+;                                  |L|  L  | L |       |       |   |                             |               |
+;                                  |U|  U  | U +-------+-------+---+                             +---+-----------+
+;                                  |X|  S  | C |       |       |   |                                 |           |
+;                                  |M|  H  | I |       | ALUOD |DQ2|                                 |   CCPSL   |
+;                                  | |  F  |   |       |       |   |                                 |           |
+;                                  +-+-----+---+       +-------+---+                                 +-----------+
+;                                  |           |               |   |
+;                                  |  ROTSRK   |               |DQ3|
+;                                  |           |               |   |
+;                                  +-----------+               +---+
+;
+;
+;
+;
+;
+;                                            +---------------------------------------+
+;                                            |                  2                    |
+;                                            +-------+-+-+---------------------------+
+;                                            |       |C|J|                           |
+;                                            |  FPA  |L|S|            NEXT           |
+;                                            |       |K|R|                           |
+;                                            |       |X| |                           |
+;                                            +-------+-+-+---------------------------+
+;                                            |1 1 1 1|1|1|1 1 1 1 0 0 0 0 0 0 0 0 0 0|
+;                                            |9 8 7 6|5|4|3 2 1 0 9 8 7 6 5 4 3 2 1 0|
+;                                            +-------+-+-+---------------------------+
+.TOC "  Machine Definition              : ALPCTL"
+
+ALPCTL/=<57:48>,.DEFAULT=364            ;ALP SPECIAL FUNCTIONS                                     ;ALU OPERATION FOR
+        NOP=364                                         ;ALUOD/OR,MUX/Z.S,DQ1/NOP                  ;SETTING OF ALU FLAGS
+        WX_D_Q.Q_D=2D7                                  ;WMUX & D <- Q OLD      Q <- D OLD               D+Q+CI.BCD
+        WX_D_Q.Q_M=0D7                                  ;WMUX & D <- Q OLD      Q <- MBUS                M+Q+CI.BCD
+        WX_D_R.Q_D=257                                  ;WMUX & D <- RBUS       Q <- D OLD               D+R+CI.BCD
+        WX_D_R.Q_M=057                                  ;WMUX & D <- RBUS       Q <- MBUS                M+R+CI.BCD
+        WX_D_R.Q_XM=157,        .VALIDITY=<V070>        ;WMUX & D <- RBUS       Q <- S/Z MBUS           XM+R+CI.BCD
+        WX_D_S.Q_0=357                                  ;WMUX & D <- SUP ROT    Q <- 0                   0+S+ 0.BCD
+        WX_D_S.Q_R=3D7                                  ;WMUX & D <- SUP ROT    Q <- RBUS                R+S+ 0.BCD
+        WX_D_S.Q_XM=1D7,        .VALIDITY=<V070>        ;WMUX & D <- SUP ROT    Q <- S/Z MBUS           XM+S+ 0.BCD
+        WX_Q.Q_D=2C7                                    ;WMUX     <- Q OLD      Q <- D                   D-Q-CI.BCD
+        WX_Q.Q_M=0C7                                    ;WMUX     <- Q OLD      Q <- MBUS                M-Q-CI.BCD
+        WX_R.Q_D=247                                    ;WMUX     <- RBUS       Q <- D                   D-R-CI.BCD
+        WX_R.Q_M=047                                    ;WMUX     <- RBUS       Q <- MBUS                M-R-CI.BCD
+        WX_R.Q_XM=147,          .VALIDITY=<V070>        ;WMUX     <- RBUS       Q <- S/Z MBUS           XM-R-CI.BCD
+        WX_S.Q_0=347                                    ;WMUX     <- SUP ROT    Q <- O                   0-S- 0.BCD
+        WX_S.Q_R=3C7                                    ;WMUX     <- SUP ROT    Q <- RBUS                R-S- 0.BCD
+        WX_S.Q_XM=1C7,          .VALIDITY=<V070>        ;WMUX     <- SUP ROT    Q <- S/Z MBUS           XM-S- 0.BCD
+
+        WX_D_Q_S=373                                    ;WMUX & D & Q <- SUP ROT
+        WX_D_S=372                                      ;WMUX & D     <- SUP ROT
+        WX_Q_S=371                                      ;WMUX & Q     <- SUP ROT
+        WX_S=370                                        ;WMUX         <- SUP ROT
+        WX_D_Q_.NOT.S=363                               ;WMUX & D & Q <- .NOT.(SUP ROT)
+        WX_D_.NOT.S=362                                 ;WMUX & D     <- .NOT.(SUP ROT)
+        WX_Q_.NOT.S=361                                 ;WMUX & Q     <- .NOT.(SUP ROT)
+        WX_.NOT.S=360                                   ;WMUX         <- .NOT.(SUP ROT)
+
+        WX_D_DSL.SQL=24E                                ;WMXU & D <- D SHF LEFT     Q <- SHF LEFT       (D-R-CI).SL
+        WX_D_DSL.SQR=24F                                ;WMXU & D <- D SHF LEFT     Q <- SHF RIGHT      (D-R-CI).SL
+        WX_D_DSR.SQL=24A                                ;WMXU & D <- D SHF RIGHT    Q <- SHF LEFT       (D-R-CI).SR
+        WX_D_DSR.SQR=24B                                ;WMXU & D <- D SHF RIGHT    Q <- SHF RIGHT      (D-R-CI).SR
+
+        WB_LOOPF=378                                    ;WB<31:3O> <- 0'LOOP FLAG
+        WB_LOOPF.Q_0=379                                ;WB<31:3O> <- 0'LOOP FLAG   Q     <- 0
+        WB_LOOPF.D_0=37A                                ;WB<31:30> <- 0'LOOP FLAG   D     <- 0
+        WB_LOOPF.Q_D_0=37B                              ;WB<31:30> <- 0'LOOP FLAG   Q & D <- 0
+        WB_ALUF=37C                                     ;WB<31:3O> <- ALUS0'ALKC
+        WB_ALUF.Q_S=37D                                 ;WB<31:30> <- ALUS0'ALKC    Q     <- S
+        WB_ALUF.D_S=37E                                 ;WB<31:30> <- ALUS0'ALKC    D     <- S
+        WB_ALUF.Q_D_S=37F                               ;WB<31:30> <- ALUS0'ALKC    Q &  D <- S
+
+        MULFAST+=279,   .VALIDITY=<V21.50-54.70>        ;MULTIPLY +RBUS BY Q (2 ITERATIONS PER CYCLE)
+        MULSLOW+=27B,   .VALIDITY=<V50.51.70>           ;MULTIPLY +RBUS BY Q (1 ITERATION  PER CYCLE)
+        MULFAST-=269,   .VALIDITY=<V21.50-54.70>        ;MULTIPLY -RBUS BY Q (2 ITERATIONS PER CYCLE)
+        MULSLOW-=26B,   .VALIDITY=<V50.51.70>           ;MULTIPLY -RBUS BY Q (1 ITERATION  PER CYCLE)
+        DIVFAST+=26C,   .VALIDITY=<V21.50-54.70>        ;DIVIDE Q BY +RBUS (2 ITERATIONS PER CYCLE)
+        DIVSLOW+=26E,   .VALIDITY=<V50.51.70>           ;DIVIDE Q BY +RBUS (1 ITERATION  PER CYCLE)
+        DIVFAST-=27C,   .VALIDITY=<V21.5O-54.70>        ;DIVIDE Q BY -RBUS (2 ITERATIONS PER CYCLE)
+        DIVSLOW-=27E,   .VALIDITY=<V50.51.70>           ;DIVIDE Q BY -RBUS (1 ITERATION  PER CYCLE)
+        REM=26A,        .VALIDITY=<V050>                ;UNSHIFT REMAINDER (RBUS MUST BE 0)
+        DIVDA=27F,      .VALIDITY=<V050>                ;DIVIDE DOUBLE ADD
+        DIVDS=26F,      .VALIDITY=<V050>                ;DIVIDE DOUBLE SUB
+.TOC "  Machine Definition              : ALU, ALUCI, ALUOD, ALUSHF, ALUXM"
+
+ALU/=<53:50>            ;ALU FUNCTION CONTROL FOR MUX/(M.R1, M.R2, M.Q1, M,Q2
+                        ;M.S, XM.R, XM.Q, ZM.S, D.R1, D.Q1, D.Q2, D.S, R.Q, R.S)
+        A-B-CI=0        ;SUB WITH CARRY INPUT
+        A-B-CI.BCD=1    ;BCD SUB WITH CARRY INPUT
+        A-B-CI.SR=2     ;(SUB WITH CARRY INPUT) SHIFTED RIGHT
+        A-B-CI.SL=3     ;(SUB WITH CARRY INPUT) SHIFTED LEFT
+        B-A-CI=0C       ;SUB WITH CARRY INPUT
+
+        A+B+CI=4        ;ADD WITH CARRY INPUT
+        A+B+CI.BCD=5    ;BCD ADD WITH CARRY INPUT
+        A+B+CI.SR=6     ;(ADD WITH CARRY INPUT) SHIFTED RIGHT
+        A+B+CI.SL=7     ;(ADD WITH CARRY INPUT) SHIFTED LEFT
+
+        AND=8           ;A.AND.B
+        OR=9            ;A.OR.B
+        AND.SR=0A       ;(A.AND.B) SHIFTED RIGHT
+        AND.SL=0B       ;(A.AND.B) SHIFTED LEFT
+        XOR=0D          ;A.XOR.B
+        ANDNOT=0E       ;A.AND.(.NOT.B)
+        NOTAND=0F       ;(.NOT.A).AND.B
+
+ALUCI/=<59:58>          ;ALU CARRY INPUT CONTROL WHEN MUX DOES NOT SELECT S ROT AND P OR S LATCH IS NOT MODIFIED
+        ZERO=0          ;CI <- 0
+        ALKC=1          ;CI <- ALK<C>
+        ONE=2           ;CI <- 1
+        PSLC=3          ;CI <- PSL<C>
+
+ALUOD/=<53:50>          ;ALU FUNCTION CONTROL FOR MUX/(D.R2, Z.S)
+        AND.OD=8        ;A.AND.B                OUTPUT DISABLE
+        OR.OD=9         ;A.OR.B                 OUTPUT DISABLE
+        AND.SR.OD=0A    ;(A.AND.B) SHFTD RIGHT  OUTPUT DISABLE
+        AND.SL.OD=0B    ;(A.AND.B) SHFTD LEFT   OUTPUT DISABLE
+        B-A-CI.OD=0C    ;SUB WITH CARRY         OUTPUT DISABLE
+        XOR.OD=0D       ;A.XOR.B                OUTPUT DISABLE
+        ANDNOT.OD=0E    ;A.AND.(.NOT.B)         OUTPUT DISABLE
+        NOTAND.OD=0F    ;(.NOT.A).AND.B         OUTPUT DISABLE
+
+ALUSHF/=<62:60>         ;ALP SHIFT-IN CONTROL WHEN MUX DOES NOT SELECT S ROT AND P OR S LATCH IS NOT MODIFIED
+                        ;ALU      Q
+        ;HARD DFFAULT   ; 0       0
+        ZERO=0          ; 0       0
+        ONE=1           ; 1       1
+        SHF=2           ;(SHIFT ALU'Q)  (SEF TABLE 1)
+        ROT=3           ;(ROT   ALU'Q)  (SEE TABLE 1)
+        ALU0.Q1=4       ; 0       1
+        ALU1.Q0=5       ; 1       0
+        WBUS30=6        ;WBUS<30> WBUS 30>
+        PSLC=7          ;PSL<C>   PSL<C>
+
+ALUXM/=<63:63>          ;MBUS SIGN/ZERO FXT_CONTOL
+        ZERO=0          ;ZERO EXTEND MBUS
+        SIGN=1          ;SIGN EXTEND MBUS
+.TOC "  Machine Definition              : BUS"
+
+BUS/=<24:20>,.DEFAULT=7                 ;BUS FUNCTIONS
+        NOP=7                                   ;NO OP
+        READ=10,        .VALIDITY=<V22.70>      ;MDR <- MEMORY PER BY VA AND DSIZE.
+        READ.MOD=14,    .VALIDITY=<V22.70>      ;CHECK FOR WRITE ACCESS THEN "RD".
+        READ.LNG=11,    .VALIDITY=<V022>        ;READ IGNORING THE TWO LSB'S OF THE VA
+        READ.LNG.MOD=15,.VALIDITY=<V022>        ;CHECK FOR WRITE ACCESS THE "RD.L".
+        READ.NT=2,      .VALIDITY=<V022>        ;SUPPRESS ACV AND UNALIGNED DATA U-TRAPS
+        READ MOD.LCK=13,.VALIDITY=<V22.70>      ;READ, LOCK OUT OTHER READ LOCKS
+        READ.PHY=0,     .VALIDITY=<V022>        ;READ TREATING VA AS PHYSICAL ADDRESS, IGNORE 2 LSB'S.
+        READ.SEC=6,     .VALIDITY=<V022>        ;FETCH REMAINDER OF A READ CROSSING LONG BOUNDARY.                      -
+
+        WRITE=18,       .VALIDITY=<V20.70>      ;WRITE MEMORY SPECIFIED_BY VA, DSIZE, WDR
+        WRITE.NOREG=1A, .VALIDITY=<V20.70>      ;WRITE UNLESS REGISTER MODE ASSERTTED.
+        WRITE.LNG=19,   .VALIDITY=<V20.70>      ;WRITE IGNORING THE 2 LSB'S OF THE VA
+        WRITE.NT=0C,    .VALIDITY=<V020>        ;WRITE. SUPPRESS ACV, UNALIGNED DATA, AND PAGE BOUNDARY U-TRAPS
+        WRITE NT.LNG=0E,.VALIDITY=<V020>        ;"WRITE.NOTRP"  LONGWORD. USED FOR WRITING THE M-BIT.
+        WRITE.UL=1B,    .VALIDITY=<V20.70>      ;WRITE. RELEASE LOCK SET BY_READ.LCK
+        WRITE.PHY=8,    .VALIDITY=<V020>        ;WRITE TREATING VA AS PHYSICAL ADDRESS, IGNORE 2 LSB'S.
+        WRITE.SEC=0A,   .VALIDITY=<V020>        ;WRITE SECOND REFERENCE
+        WRITE.UL.SEC=0B,.VALIDITY=<V020>        ;WRITE.SEC. RELEASE LOCK SET BY "RD.LK".
+
+        PRB RD=1F,      .VALIDITY=<V24.25.70>   ;PROBE PTL IN TB FOR READ ACCESS AT ADDRESS IN VA.
+        PRB.RD.MODE=1E, .VALIDITY=<V24.25.70>   ;PRB.R USING WBUS<25:24> INSTEAD OF THE CURRENT MODE.
+        PRB.RD.PTE=16,  .VALIDITY=<V023>        ;PROBE PTE IMAGE ON WBUS FOR READ ACCESS.
+        PRB.RD.PTE.K=17,.VALIDITY=<V023>        ;PTE.R USING KERNEL MODE INSTEAD OF CURRENT MODE.
+        PRB.WR=1D,      .VALIDITY=<V24.25.70>   ;PROBE PTE IN TB FOR WRITE ACCESS AT ADDRESS IN VA.
+        PRB.WR.MODE=1C, .VALIDITY=<V24.25.70>   ;PRB.W USING WBUS<25:24> INSTEAD OF THE CURRENT MODE.
+        PRB.WR.PTE=12,  .VALIDITY=<V023>        ;PROBE PTE IMAGE ON WBUS FOR WRITE ACCESS.
+        IOINIT=3,       .VALIDITY=<V021>        ;GENERATE UNIBUS INIT.
+        PRINIT=1,       .VALIDITY=<V021>        ;GENERATE A MASTER PROCESSOR RESET. (INCLUDES AN IOINIT)
+        REICHK=9,       .VALIDITY=<V008>        ;REI CHECK
+        GRANT=0F,       .VALIDITY=<V09.21>      ;ISSUE UNIBUS GRANT
+.TOC "  Machine Definition              : BUT"
+
+BUT/=<47:42>,.DEFAULT=0
+                        ; NOTE 01 : ALU/A+B+CI.BCD, ALEG/DATA, BLEG/0.  A 1 IN CSA<0> Indicates Illegal BCD Char
+
+                        ; NOTE 02 : VA<0>.AND.NOT.IR<3> FOR Native Mode, VA<0>.AND.NOT.IR<7> FOR Compatibility Mode
+
+                        ; NOTE 03 : STEPC <- STEPC - 4 & Branch ON Original Value  CSA<2>  CSA<1>  CSA<0>
+                        ;          ORIG VALUE = 0                                   0       0       0
+                        ;          ORIG VALUE = 1                                   0       0       1
+                        ;          ORIG VALUE = 2                                   0       1       0
+                        ;          ORIG VALUE = 3                                   0       1       1
+                        ;          ORIG VALUE >OR= 4, AND NO INT OR TIM OV          1       0       0
+                        ;          ORIG VALUE >OR= 4, AND INT OR TIM OV             1       0       1
+
+                        ; NOTE 04 : CSA<1> = (.NOT.MM.NOINT).AND.(INT.OR.TIMSERV)
+
+                        ; NOTE 05 : For Description of BUT/SPASTA Operation See Tables and Charts
+
+                        ; NOTF 06 : For Description of BUT/SRKSTA 0peration See ROT & ROTSRK Micro field Definitions
+
+                        ; NOTE 07 : For Description of BUT/CCBR Operation See Tables and Charts
+
+                        ; NOTE 08 : In Compatibility Mode BUT is on CIR(See MSQ Spec Page 32)
+
+                        ; NOTE 09 : For Description of BUT/UVCTR Operation See Tables and Charts
+
+                        ; NOTE 10 :  START<1>  START<0>  Function
+                        ;              0         0       Restart/Boot
+                        ;              0         1       Restart/Halt
+                        ;              1         0       Boot
+                        ;              1         1       Halt                                .
+
+                        ; NOTE 11 :  BOOT<1>   BOOT<0>   Function
+                        ;              0         0          D
+                        ;              0         1          C
+                        ;              1         0          B
+                        ;              1         1          A
+
+        NOP=0           ;NO BRANCH
+        IRD1=4          ;EVALUATE OPCODE AND 1ST OPERAND OF NEXT INSTRUCTION
+        IRD1TST=5       ;SAME AS IRD1 EXCEPT NEXT ADDRESS IS FROM 'NEXT'
+        IRDX=1          ;RE1URN FRCM OPERAND EVALUATION
+        RETURN=2        ;POP U-STK AND RET TO 'STK + NEXT'(MOD64)
+        RET.DINH=3      ;POP U-STK AND RET TO 'STK + NEXT'(MOD64),DEST INH
+        LOD.INC.BRA=6   ;LOAD OSR, INC IRDCNT, BRANCH ON ADD MODE
+        LOD.BRA=7       ;LOAD OSR,           , BRANCH ON ADD MODE
+        BRA.ON.ADD=18   ;        ,           , BRANCH ON ADD MODE
+                          ;--------+--------+----------+----------+--------------+----------------------------------+
+                          ; CSA<5> | CSA<4> |  CSA<3>  |  CSA<2>  |    CSA<1>    |              CSA<0>              |
+                          ;--------+--------+----------+----------+--------------+----------------------------------+
+                          ;        |        |          |          |              |                                  |
+        BUTXB=20          ;        |        |          |          |              | BUT XB UTRAP = 1, ELSE 0         |
+        CM.ODD.ADD=21     ;        |        |          |          |              | NOTE 2                           |
+        IR.2TO0=19        ;        |        |          | IR<2>    | IR<1>        | IR<0>                            |
+        IR5=23            ;        |        |          |          |              | IR<5>                    (NOTE 8)|
+        IR2=22            ;        |        |          |          |              | IR<2>                    (NOTE 8)|
+        REGMODE=24        ;        |        |          |          |              | OSR<7:4>=5                       |
+                          ;        |        |          |          |              |                                  |
+        FRO.FLTZ=2A       ;        |        |          |          | NOT.MBUS<15> | WX<31:0>.NE.0                    |
+        WBUS1TO0=9        ;        |        |          |          | WBUS<1>      | WBUS<0>                          |
+        WBUS1TO0.NE.0=0E  ;        |        |          |          |              | WBUS<1:0>,NE.0                   |
+        WBUS5TO0=08       ; WB<5>  | WB<4>  | WB<3>    | WB<2>    | WB<1>        | WB<0>                            |
+        WBUS0=0A          ;        |        |          |          |              | WB<O>                            |
+        WBUS31TO30=1B     ;        |        |          |          | WB<31>       | WB<30>                           |
+                          ;        |        |          |          |              |                                  |
+        WX.EQ.0=28        ;        |        |          |          |              | WMUX<31:0>.EQ.0                  |
+        WX.NE.0=29        ;        |        |          |          |              | WMUX<31:O>.NE.0                  |
+        BCDCHK=26         ;        |        |          |          |              | NOTE 1                           |
+        SRKSTA=37         ;        |        |          |          | SRKSTA<1>    | SRKSTA<0>                (NOTE 6)|
+        SPASTA=2E         ;        |        |          |          | SPASTA<1>    | SPASTA<0>                (NOTE 5)|
+        CCBR=2D           ;        |        |          |          | CCBR<1>      | CCBR<0>                  (NOTE 7)|
+        CCBR1.CCBR0.IR0=35;        |        |          | CCBR<1>  | CCBR<0>      | .NOT.IR<0>               (NOTE 8)|
+        CCBRO.SRKSTA0=36  ;        |        |          |          | CCBR<0>      | SRKSTA<0>                        |
+        D IZE=31          ;        |        |          |          | DSIZE<1>     | DSIZE<0>                (LATCHES)|
+        DBZ.SC=0C         ;        |        |          |          |              | SC.EQ.0                          |
+        NO.FPA=30         ;        |        |          |          |              | 0=FPA PRESENT, T=NO FPA          |
+        WCSENA=27         ;        |        |          |          |              | 0=WCS PRESENT AND ENABLED        |
+                          ;        |        |          |          |              | 1=WCS NOT PRESENT OR WCS DISABLED|
+                          ;        |        |          |          |              |                                  |
+        BR.SC-4.INT-TS=0D ;        |        |          | NOTE 3   | NOTE 3       | NOTE 3                           |
+        MM.ALL0W.INT=0B   ;        |        |          |          | NOTE 4       |                                  |
+        INT-TIMSERV=2B    ;        |        |          |          | .NOT.INT     | TIMSERV                          |
+        CCBR1.INT-TS=20   ;        |        |          |          | CCBR<1>      | (INT.OR.TIMSERV).AND.NOT.CCBR<1> |
+                          ;        |        |          |          |              |                                  |
+        FPD=0F            ;        |        |          |          |              | PSL<27>                          |
+        PSLC=25           ;        |        |          |          |              | PSL<C>                           |
+        PSLTP=2F          ;        |        |          |          |              | PSL<TP>                          |
+        UVCTR=1F          ;        |        | UVCTR<3> | UVCTR<2> | UVCTR<1>     | UVCTR<0>                 (NOTF 9)|
+        FPS1=34           ;        |        |          | NOT.HALT | START<1>     | START<0>                (NOTF 1O)|
+        FPS2=33           ;        |        |          |          | BOOT<1>      | BOOT<0>                 (NOTE 1T)|
+        FPS3=32           ;        |        |          |          | ACLO         | FPLOCK                           |
+        FLAG0=10          ;        |        |          |          |              | FLAG0                            |
+        FLAG1=17          ;        |        |          |          | FLAG1        |                                  |
+        FLAG2=12          ;        |        |          | FLAG2    |              |                                  |
+        FLAG3=13          ;        |        |          |          |              | FLAG3                            |
+        MM.NOINT=11       ;        |        |          |          |              | MM.NOINT                  (FLAG4)|
+        STACKFLG=1A       ;        |        |          |          |              | PSHSTACK                  (FLAG5)|
+        FLAG2TO0=16       ;        |        |          | FLAG2    | FLAG1        | FLAG0                            |
+        FLAG1TO0=14       ;        |        |          |          | FLAG1        | FLAG0                            |
+        F1.XOR23=15       ;        |        |          |          | FLAG1        | FLAG2.XOR.FLAG3                  |
+                          ;--------+--------+----------+----------+--------------+----------------------------------+
+.TOC "  Machine Definition              : CC, CCMISC, CCPSL"
+
+
+CC/=<32:31>,.DEFAULT=0                                          ;CC CONTROL               CCBR CONTROL
+        NOP.CCBR SIGND=0,               .VALIDITY=<V071>        ;NOP                      SIGNED COMPARE
+        NOP.CCBR_ALUS=3                                         ;NOP                      ALU STATE LATCHES
+        CCOP1.CCBR_SIGND=1,             .VALIDITY=<V070>        ;CC OP 1                  SIGNED COMPARE
+        CCOP2.CCBR_SIGND=2,             .VALIDITY=<V070>        ;CC OP 2                  SIGNED COMPARE
+
+
+
+
+
+CCMISC/=<32:25>                                                 ;MISC                      CCBR CONTROL
+        NOP.CCBR_BRATST=0C7                                     ;NOP                      BRANCH CONDITION TRUE
+        NOP.CCBR_CSIGNS=46,             .VALIDITY=<V071>        ;NOP                      COMPARE SIGNS
+        WB_ATCR.CCBR_SIGND=7,           .VALIDITY=<V71.80>      ;WBUS<3:0> <- ATCR        SIGNED COMPARE
+        ALUS_DSDZ.CCBR_ALUS=6                                   ;AlUS <- DEC SIGN DEC 0   OLD ALUS
+        ALUS_SIGND.CCBR_ALUS=0C6,       .VALIDITY=<V070>        ;ALUS <- SIGNED COMPARE   OLD ALUS
+        ALUS_UNSGN.CCBR_ALUS=86,        .VALIDITY=<V070>        ;ALUS <- UNSIGNED COMPARE OLD ALUS
+        SETV.CCBR_SIGND=47,             .VALIDITY=<V071>        ;PSL<V> <- 1              SIGNED COMPARE
+
+
+
+
+
+CCPSL/=<30:25>                                                   ;PSL(W)                   CCBR CONTROL
+        WB_PSL.CCBR_SIGND=4,            .VALIDITY=<V00.71.80>    ;READ PSL                 SIGNED COMPARE
+        CC_WB.CCBR_ALUS=5                                        ;CC <- WBUS<3:0>          ALU STATE LATCHES
+        PSL_WB.CCBR_ALUS=0,             .VALIDITY=<V001>         ;WRITE PSL                ALU STATE LATCHES
+        PSW_WB.CCBR_ALUS=1                                       ;WRITE PSW                ALU STATE LATCHES
+        MDR_OSR.CCBR_BRATST=2F,         .VALIDITY=<V02.33.41>    ;MDR <- ZEXT OSR          BRANCH CONDITION TRUE
+
+; NOTE : DEFAULT FOR CC & CCMISC DURING LONG OR SHORT LITERAL IS 'CC/NOP.CCBR_SIGND'.
+;
+; NOTE : FOR DESCRIPTION OF BUT/CCBR SEL TABLES AND CHARTS.
+.TOC "  Machine Definition              : CLKX, DQ1, DQ2, DQ3, DTYPE, FPA"
+
+CLKX/=<15:15>,.DEFAULT=0        ;CLOCK EXTEND CONTROL
+        NOP=0                                           ;NORMAL CLOCK
+        XTND=1                                          ;STRETCH CYCLE
+
+DQ1/=<49:48>,.DEFAULT=0         ;D&Q REG CONT FOR MUX/(M.R1, M.Q1, M.S, XM.R, XM.Q, XM.S, D.R1, D.Q1, D.S, Z.S, R.Q, R.S)
+        NOP=0                                           ;NOP
+        Q_WX=1                                          ;Q <- WMUX
+        D_WX=2                                          ;D <- WMUX
+        Q_D_WX=3                                        ;Q <- WMUX      D <- WMUX
+
+DQ2/=<49:48>                    ;D&Q REG CONT FOR MUX/(M.R2, M.Q2, D.Q2)
+        SQL=0                                           ;SHF Q LEFT
+        SQR=1                                           ;SHF Q RIGHT
+        SQL.D_WX=2                                      ;SHF Q LEFT     D <- WMUX
+        SQR.D_WX=3                                      ;SHF Q RIGHT    D <- WMUX
+
+DQ3/=<49:48>                    ;D&Q REG CONT FOR MUX/D.R2
+        SQL.D_WX=0                                      ;SHF Q LEFT     D <- WMUX
+        SQR.D_WX=1                                      ;SHF Q RIGHT    D <- WMUX
+
+DTYPE/=<41:40>,.DEFAULT=3
+        BYTE=0                                          ;DATA SIZE IS BYTE
+        WORD=1                                          ;DATA SIZE IS WORD
+        LONG=2                                          ;DATA SIZE IS LONG WORD
+        IDEP=3                                          ;DATA SIZE IS INSTRUCTION DEPENDANT
+
+FPA/=<19:16>,.DEFAULT=0         ;FLOATING POINT ACCELERATOR CONTROL
+        NOP=0                                           ;
+
+        FPA_DATA.MBUS=1                                 ;FPA <- MBUS (Use when not 2nd half of dble OS2 REG dest) *See note*
+        FPA_DATA.WBUS=6                                 ;FPA <- WBUS (Use when     2nd half of dble OS2 REG dest) *See note*
+        FPA_MBUS.LITNXT=2                               ;FPA <- MBUS, NEXT XFER WILL BE SHORT LITERAL
+        FPA_MBUS.FPA_WBUS=3                             ;FPA <- BOTH MBUS & WBUS
+        WBUS_FPA=4,             .VALIDITY=<V080>        ;WBUS <- FPA DATA
+        WBUS_FPA.CC=5,          .VALIDITY=<V080>        ;WBUS<3:0> <- CC'S FROM FPA
+
+; Note : The presence of either micro-order(6 or 1) instructs the FPA to accept data. The FPA does not distinguish
+;        between the two  icro-orders and automaticly accepts data from the correct buss. The different micro-orders
+;        exist to enable the CLOKX post processor to determine from which buss the FPA is recieving data.
+.TOC "  Machine Definition              : ISTRM, JSR, LIT, LITRL, LONLIT, MISC"
+
+ISTRM/=<33:33>,.DEFAULT=0
+        NOP=0                                   ;ISIZE IS DETERMINED BY HARDWARE
+        ISIZE_DSIZE=1,  .VALIDITY=<V070>        ;ISIZE IS DETERMINED BY DSIZE
+
+JSR/=<14:14>,.DEFAULT=0                         ;SUBROUTINE CONTROL
+        NOP=0                                   ;NO OPERATION
+        PUSH=1                                  ;PUSH CURRENT ADDRESS ON MICRO STACK
+
+LIT/=<77:76>,.DEFAULT=0                         ;DEFINE UWORD FIELD INTERPRETATIONS
+        NORMAL=0                                ;FIELDS ARE NORMAL
+        LITRL=1,        .VALIDITY=<V071>        ;SHORT LITERAL FIELD ENABLED
+        FPAWAIT=2                               ;WAIT FOR FPA TO COMPLETE PROCESSING
+        LONLIT=3                                ;LONG LITERAL FIELD ENABLED
+
+LITRL/=<39:31>,         .VALIDITY=<V071>        ;SHORT LITERAL
+
+LONLIT/=<62:31>                                 ;LONG LITERAL
+
+MISC/=<75:71>,.DEFAULT=1O                       ;DEFINE MISC FUNCTIONS
+        NOP=10
+
+        CLR.FLAG0=0                             ;CLEAR FLAG 0
+        ClR.FLAG1=1                             ;CLEAR FLAG 1
+        CLR.FLAG2=2                             ;CLEAR FLAG 2
+        CLR.FLAG3=3                             ;CLEAR FLAG 3
+        CLR.MMNOINT=4                           ;CLEAR FLAG 4
+        CLR.STACKFlG=5                          ;CLEAR FLAG 5
+
+        SET.FLAGO=8                             ;SET FLAG 0
+        SET.FLAG1=9                             ;SET FLAG 1
+        SET.FLAG2=0A                            ;SET FLAG 2
+        SFT.FLAG3=0B                            ;SET FLAG 3
+        SET.MMNOINT=0C                          ;SET FLAG 4
+        SET.STACKFLG=0D                         ;SET FLAG 5
+
+        RSBC=1B                                 ;RETURN AND SUPPRESS BUS CYCLE
+        RNUM_2REG=11                            ;RNUM <- COMP_MODE SECOND REG
+        CLR.TP=12                               ;PSL<TP> <- 0
+        CLR.FPD=1C                              ;PSL<FPD> <- 0
+        SET.FPD=1D                              ;PSL<FPD> <- 1
+        FORCE.TB=1F                             ;FORCE TB PARITY ERROR
+        FORCE.CACHE=1F                          ;FORCE CACHE PARITY ERROR
+
+        DEC.SC=13                               ;STEP CNT <- STEP CNT - 1
+        SC_2=14                                 ;STEP CNT <- 2
+        SC_6=15                                 ;STEP CNT <- 6
+        SC_14=16                                ;STFP CNT <- 14
+        SC_30=17                                ;STEP CNT <- 30
+.TOC "  Machine Definition              : MSRC"
+
+MSRC/=<68:64>,.DEFAULT=0;M SCRATCH PAD ADD, M BUS, RBS, AND RNUM CONTROL
+
+        TEMP0=00                                ;MBUS <- DUAL PORT TEMP 0
+        TEMP1=01                                ;MBUS <- DUAL PORT TEMP 1
+        TEMP2=02                                ;MBUS <- DUAL PORT TEMP 2
+        TEMP3=03                                ;MBUS <- DUAL PORT TEMP 3
+        TEMP4=04                                ;MBUS <- DUAL PORT TEMP 4
+        TEMP5=05                                ;MBUS <- DUAL PORT TEMP 5
+        TEMP6=06                                ;MBUS <- DUAL PORT TEMP 6
+        TEMP7=07                                ;MBUS <- DUAL PORT TEMP 7
+        TEMP8=08                                ;MBUS <- M S-PAD TEMP 8
+        TEMP9=09                                ;MBUS <- M S-PAD TEMP 9
+        TEMP10=0A                               ;MBUS <- M S-PAD TEMP 10
+        ERRCOD=0B                               ;ERROR CODE FOR MEMORY FAULTS & ARITHMETIC TRAPS
+        FPDOFFSET=0C                            ;MBUS <- FPD PACK ROUTINE OFFSET
+        MM.TEMP0=0D                             ;MBUS <- MEMORY MANAG. TEMP 0
+        SCBB=0E                                 ;SYSTEM CONTROL BLOCK BASE
+        SISR=0F                                 ;SOFTWARE INT SUMMARY REGISTER
+
+        TEMP.R=10                               ;MBUS <- M S-PAD INDX BY RNUM
+        TEMP.R+1=11                             ;MBUS <- M S-PAD INDX BY RNUM+1
+
+                                                ;RNUM CONTROL                           DEFAULT MTMP
+        RNUM_WBUS=1D                            ;RNUM <- WBUS<3:0>                      MTMP0
+        WBUS_RNUM=16,   .VALIDITY=<V080>        ;WBUS<3:0> <- RNUM                      MTMPO
+
+                                                ;RBS CONTROL                            DEFAULT MTMP
+        PSHADD=15,      .VALIDITY=<V070>        ;PUSH |REG ADDRESS|DSIZE|+| & INC RBSP  MTMPO
+        PSHSUB=14,      .VALIDITY=<V070>        ;PUSH |REG ADDRESS|DSIZE|-| & INC RBSP  MTMP0
+        READRBS=1C,     .VALIDITY=<V080>        ;READ RBS           & INC RBSP          MTMP0
+        WB_RBSP=1E,     .VALIDITY=<V080>        ;WBUS<3:0> <- 0'RBS POINTER             MTMP0
+
+                                                ;MEMORY INTERFACE CONTROL               DEFAULT MTMP
+        MDR=12                                  ;MBUS <- MEMORY DATA REGISTER           MTMP0  W ONLY
+        VA=1B                                   ;MBUS <- VIRTUAL ADDRESS REGISTER       MTMP0  W ONLY
+        PC=1A                                   ;MBUS <- PROGRAM COUNTER                MTMP0  W ONLY
+        XB.PC_PC+I=17,  .VALIDITY=<V070>        ;MBUS <- EXECUTION BUF . PC <- PC+ISIZE MTMP0  W ONLY
+        PCBACK=19                               ;MBUS <- PC_BACK                        MTMP0  W ONLY
+        MA=18                                   ;MBUS <- MEMORY ADDRESS REGISTER        MTMP0  W ONLY
+        TB=1F                                   ;MBUS <- TRAN BUF DATA                  MTMP0  W ONLY
+        WDR=13,         .VALIDITY=<V038>        ;MBUS <- WRITE DATA REGISTER            MTMP0  W ONLY
+.TOC "  Machine Definition              : MUX, NEXT, PAR1, PAR2, PARF1A, PARF1B, PARF2"
+
+MUX/=<57:54>                            ;ALP A AND B MUX INPUT CONTROL
+        M.R1=0                          ;A <- MBUS              B <- RBUS
+        M.R2=1                          ;A <- MBUS              B <- RBUS
+        M.Q1=2                          ;A <- MBUS              B <- Q REGISTER
+        M.Q2=3                          ;A <- MBUS              B <- Q REGISTER
+        M.S=4                           ;A <- MBUS              B <- SHIFTER
+        XM.R=5, .VALIDITY=<V070>        ;A <- EXTENDED MBUS     B <- RBUS
+        XM.Q=6, .VALIDITY=<V070>        ;A <- EXTENDED MBUS     B <- Q REGISTER
+        XM.S=7, .VALIDITY=<V070>        ;A <- EXTENDED MBUS     B <- SHIFTER
+        D.R1=8                          ;A <- D REGISTER        B <- RBUS
+        D.R2=9                          ;A <- D REGISTER        B <- RBUS
+        D.Q1=0A                         ;A <- D REGISTER        B <- Q REGISTER
+        D.Q2=0B                         ;A <- D REGISTER        B <- Q REGISTER
+        D.S=0C                          ;A <- D REGISTER        B <- SHIFTER
+        Z.S=0D                          ;A <- 0                 B <- SHIFTER
+        R.Q=0E                          ;A <- RBUS              B <- Q REGISTER
+        R.S=0F                          ;A <- RBUS              B <- SHIFTER
+.CREF                                   ;END OF CREF ONLY WHEN FULL ASSEMBLY THE FOLLOWING WILL ALWAYS CREF
+
+NEXT/=<13:0>,.NEXTADDRESS
+PATCH/=<80:80>,.DEFAULT=0
+.TOC "  Machine Definition              : ROT"
+
+.NOCREF                                 ;SET UP FOR CREF ONLY WHEN FULL ASSEMBLY
+ROT/=<63:58>                            ;SUPER ROTATOR CONTROL                           | SRKSTA<1>      SRKSTA<0>
+                                        ;------------------------------------------------+----------------------------------
+        XZ.MR=0                         ;EXTRACT & ZERO EXTEND_M'R, POS = PL, SIZE = SL  | SL.EQ.0        (PL<4:0>+SL).GT.32
+        XZ.MM=1                         ;EXTRACT & ZERO EXTEND M'M, POS = PL, SIZE = SL  | SL.EQ.0        (PL<4:0>+SL).GT.32
+        XZ.RR=2                         ;EXTRAC1 & ZERO EXTEND R'R, POS = PL, SIZE = SL  | SL.EQ.0        (PL<4:0>+SL).GT.32
+        XZ.VPN=0D,     .VALIDITY=<V072> ;EXTRACT & ZERO EXTEND M'M, POS = 09, SIZE = 21  | DSIZE<1>       DSIZE<0>
+        XZ.PTX=0C,     .VALIDITY=<V072> ;EXTRACT & ZERO EXTEND M'M, POS = 07, SIZE = 23  | DSIZE<1>       DSIZE<0>
+                                        ;                                                |
+        CLR1BM=13                       ;CLR M<07:0>                                     | S<3:0>.NE.0    S<3:0>.NE.(11,13)
+        CLR2BM=12                       ;CLR M<15:0>                                     | S<3:0>.NE.0    S<3:0>.NE.(11,13)
+        CLR3BM=14                       ;CLR M<23:0>                                     | ASCII SIGN CHECK (SEE TABLE)
+                                        ;                                                |
+        RL.RM.P=23                      ;ROT LEFT  R'M, NO. BITS = PLATCH<4:0>  (NOTE 1) | WX<31:16>.NE.0 WX<15:0>.NE.0
+        RL.RM.PS=20                     ;ROT LEFT  R'M, NO. BITS = (PL+SL)<4:0> (NOTE 1) | SL.EQ.0        UNDEFINED
+        RL.RM.4=8,     .VALIDITY=<V072> ;ROT LEFT  R'M, NO. BITS = 4                     | DSIZE<1>       DSIZE<0>
+        RL.MM.P=21                      ;ROT LEFT  M'M, NO. BITS = PLATCH                | SL.EQ.0        PL<5>
+        RL.MM.PTE=11                    ;ROT LEFT  M'M, NO. BITS = 9                     | S<3:0>.NE.0    S<3:0>.NE.(11,13)
+        RL.RR.P=22                      ;ROT LEFT  R'R, NO. BITS = PLATCH                | SL.EQ.0        PL<5>
+                                        ;                                                |
+        RR.MR.P=4                       ;ROT RIGHT M'R, NO. BITS = PLATCH<4:0>           | SL.EQ.0        (PL<4:0>+SL).GT.32
+        RR.MR.PS=24                     ;ROT_RIGHT M'R, NO. BITS = (PL+SL)<4:0>          | SL.EQ.0        (PL<4:0>+SL).GT.32
+        RR.MR.4=9,     .VALIDITY=<V072> ;ROT_RIGHT M'R, NO. BITS = 4                     | DSIZE<1>       DSIZE<0>
+        RR.MR.S=7                       ;ROT RIGHT M'R, NO. BITS = SLATCH<4:0>           |    0           PL<5>
+        RR.MR.9=0B,    .VALIDITY=<V072> ;ROT RIGHT M'R, NO. BITS = 9                     | DSIZE<1>       DSIZE<0>
+        RR.MM.P=5                       ;ROT RIGHT M'M, NO. BITS = PLATCH                | SL.EQ.0        (PL<4:0>+SL).GT,32
+        RR.MM.PS=25                     ;ROT RIGHT M'M, NO. BITS = PLATCH+SLATCH         | SL,EQ.0        (PL<4:0>+SL),GT.32
+        RR.MM.SIZ=0E,  .VALIDITY=<V070> ;ROT RIGHT M'M, NO. BITS = 8,16,24,0             | DSIZE<1>       DSIZE<0>
+        RR.RR.P=6                       ;ROT RIGHT R'R, NO. BITS = PLATCH                | SL.EQ.0        (PL<4:0>+SL),GT.32
+        RR.RR.PS=26                     ;ROT RIGHT R'R, NO. BITS = PLATCH+SLATCH         | SL.EQ.0        (PL<4:0>+SL).GT.32
+        RR.RR.SIZ=0A,  .VALIDITY=<V070> ;ROT RIGHT R'R, NO. BITS = 8,16,24,0             | DSIZE<1>       DSIZE<0>
+                                        ;                                                |
+        ASL.R.P=28                      ;ARITH SHF LEFT  R, NO. BITS = PLATCH (NOTE 2)   | PL<4:0>,EQ.0   PL<5>
+        ASL.R.SIZ=17,  .VALIDITY=<V070> ;ARITH SHF LEFT  R, NO. BITS = 0,1,2,3           | ASCII SIGN CHECK (SFF TABLE)
+        ASL.R.7=15                      ;ARITH SHF LEFT  R, NO. BITS = 7                 | ASCII SIGN CHECK (SEE TABLE)
+        ASL.M.P=29                      ;ARITH SHF LEFT  M, NO. BITS = PLATCH (NOTE 2)   | PL<4:0>.EQ.0   PL<5>
+                                        ;                                                |
+        ASR.M.P=3                       ;ARITH SHF RIGHT M, NO. BITS = PLATCH            |     0          PL<5>
+        ASR.M.-P=2A                     ;ARITH SHF RIGHT M, NO. BITS = -PLATCH           | PL<4:0>.EQ.0   PL<5>
+        ASR.M.3=1D                      ;ARITH SHF RIGHT M, NO. BITS = 3                 | ASCII SIGN_CHECK (SEE TABLE)
+                                        ;                                                |
+        GETNIB=0F,     .VALIDITY=<V072> ;GET LEAST SIGNIFICANT NIBBLE FR0M_MBUS          | DSIZE<1>       DSIZE<0>
+        BCDSWP=18                       ;BCD SWAP, MBUS                                  | S<3:0>.NE.0    S<3:0>.NE.(11,13)
+        CVTPN=1B                        ;CONVERT PACKED TO NUMERIC, 4NIB TO 4BYTE, MBUS  | S<3:0>.NE.0    S<3:0>.NE.(11,13)
+                                        ;RBUS_MUST = 3XX33(HEX)                          |
+        CVTNP=1F                        ;CONVERT_NUMERIC TO PACKED, 8BYTE TO 8NIB, M'P   | ASCII SIGN CHECK (SEE TABLE)
+                                        ;                                                |
+        PL_MSS=27                       ;FIND MOST SIGNIFICANT_BIT SET MBUS,WBUS         | WX<31:16>.NE.0 WX<15:0>.NE.0
+        GETEXP=10                       ;EXTRACT & ZERO EXTEND M'M POS = 7, SIZE = 8     | S<3:0>.NE.0    S<3:0>.NE.(11,13)
+        GETFPF=19                       ;UNPACK FLOATING POINT FRACTI0N, M'R             | S<3:0>.NE.0    S<3:0>.NE.(11,13)
+        FPLIT=1E                        ;EXPAND FLOATING POINT LITERAL, MBUS             | ASCII SIGN CHECK (SEE TABLE)
+        FPACK=1A                        ;S ROT<31:16,15,14:7,6:0> <-                     | S<3:0>.NE.0    S<3:0>.NE.(11,13)
+                                        ; MB<24:9>,0,RB<7:0>,MB<31:25>                   |
+        PL=2C                           ;SUP ROT <- PLATCH                               | WBUS RANGE CHECK (SEE TABLE)
+        SL=2E                           ;SUP ROT <- SLATCH                               | WBUS RANGE CHECK (SEE TABLE)
+        SL.PL_WB=2F                     ;S_ROT <- SLATCH . PLATCH  <- WB<5:0>            | WBUS RANGE CHECK (SEE TABLE)
+        OLIT0.PL43_WB=3F                ;S_ROT <- OLIT0 . PL<4:3> <- WB<1:0>             | ABS VAL CHECK (SEE TABLE)
+        OLIT0.PL_LTT=3B                 ;S_ROT <- OLIT0 . PLATCH  <- SHORT LITERAL       | ABS VAL CHECK (SEE TABLE)
+        PL.SL_WB 2D                     ;S ROT <- PLATCH . SLATCH  <- WB<5:0>            | WBUS RANGE CHECK (SEE TABLE)
+        OLIT0.SL_LIT=3D                 ;S_POT <- OLIT0 . SLATCH  <- SHORT LITERAL       | ABS VAL CHECK (SEE TABLE)
+                                        ;                                                |
+        ZERO=16                         ;CONSTANT 0                                      | ASCII SIGN CHECK (SEE TABLE)
+        MINUS1=39                       ;CONSTANT -1                                     | ABS VAL CHECK (SEE TABLE)
+        CONX.SIZ=1C,   .VALIDITY=<V070> ;CONSTANT 1,2,4,8 DEPENDING ON SIZE(-(R)+)       | ASCII SIGN CHECK (SEE TABLE)
+        ZLIT0=30                        ;0 EXTEND LITERAL & ROT LEFT 00 BITS             | ABS VAL CHECK (SEE TABLE)
+        ZLIT4=37                        ;0 EXTEND LITERAL & ROT LEFT 04 BITS             | ABS VAL CHECK (SEE TABLE)
+        ZLIT8=36                        ;0 EXTEND LITERAL & ROT LEFT 08 BITS             | ABS VAL CHECK (SEE TABLE)
+        ZLIT12=35                       ;0 EXTEND LITERAL & ROT LEFT 12 BITS             | ABS VAL CHECK (SEE TABLE)
+        ZLIT16=34                       ;0 EXTEND LITERAL & ROT LEFT 16 BITS             | ABS VAL CHECK (SEE TABLE)
+        ZLIT20=33                       ;0 EXTEND LITERAL & ROT LEFT 20 BITS             | ABS VAL CHECK (SEE TABLE)
+        ZLIT24=32                       ;0 EXTEND LITERAL & ROT LEFT 24 BITS             | ABS VAL CHECK (SEE TABLE)
+        ZLIT28=31                       ;0 EXTEND LITERAL & ROT LEFT 28 BITS             | ABS VAL CHECK (SEE TABLE)
+        ZLITPL=2B                       ;0 EXTEND LITERAL & ROT LEFT PL BITS             | PL<4:0>.EQ.0    0
+        OLIT0=38                        ;1 EXTEND LITERAL & ROT LEFT 00 BITS             | ABS VAL CHECK (SEE TABLE)
+        OLIT8=3E                        ;1 EXTEND LITERAL & ROT LEFT 08 BITS             | ABS VAL CHECK (SEE TABLE)
+        OLIT16=3C                       ;1 EXTEND LITERAL & ROT LEFT 16 BITS             | ABS VAL CHECK (SEE TABLE)
+        OLIT24=3A                       ;1 EXTEND LITERAL & ROT LEFT 24 BITS             | ABS VAL CHECK (SEE TABLE)
+
+
+;                                                                     +-----------------------+----------------- -+
+;                                                                     | SRKSTA<1>             | SRKSTA<0>         |
+; +----------------------+--------------------------------------------+-----------------------+-------------------+
+; | ASCII SIGN CHECK     | 0=WB<7:0>.EQ.45         (ASCII -)          | WB<7:0>.NE.(32,43,45) | WBUS<7:0>.NE.45   |
+; |                      | 1=WB<7:0>.EQ.[32,43     (ASCII + OR SPACE) |                       |                   |
+; |                      | 2=MACHINE CHECK                            |                       |                   |
+; |                      | 3=WB<7:0>.NE.[32,43,45  (NOT = ASCII SIGN) |                       |                   |
+; +----------------------+--------------------------------------------+-----------------------+-------------------+
+; | WBUS RANGE CHECK     | 0=WB<7:0>.EQ.[1,31                         |_WB<7:0>.GTU.31        | WB<7:O>.NE.[1,32] |
+; |    (UNSIGNED)        | 1=WB<7:0>.EQ.O                             |                       |                   |
+; |                      | 2=WB<7:0>.EQ.32                            |                       |                   |
+; |                      | 3=WE<7:0>.GT.32                            |                       |                   |
+; +-------------------- -+--------------------------------------------+-----------------------+-------------------+
+; | ABSOLUTE VALUE CHECK | 0=WB<7:0>.EQ.[-1,-31                       |_WB<7>.EQ.0            | |WB<7:0>|.GE.32   |
+; |                      | 1=WB<7:0>.LT.-31                           |                       |                   |
+; |                      | 2=WB<7:0>.EQ.[0,31                         |                       |                   |
+; |                      | 3=WB<7:0>.GT.31                            |                       |                   |
+; +----------------------+--------------------------------------------+-----------------------+-------------------+
+
+; NOTE 1 : When the rotate value is equal to zero, the super rotator will rotate by 32.
+;          The results will be as expected for all other rotate values.
+
+; NOTE 2 : When the shift value is equal to zero, the super rotator will_output zero.
+;          The results will be as expected for all other shift values.
+.TOC "  Machine Definition              : ROTSRK"
+
+ROTSRK/=<63:58>                                 ;SRKSTA<1>      SRKSTA<0>               XM      SHF     CI
+
+        ABSVAL.163.D=3B                         ;ABS VAL CHECK (SEE TABLE)              SIGN    ZERO    ZERO
+        ABSVAL.171.D=3D                         ;ABS VAL CHECK (SEE TABLE)              SIGN    ZERO    ZERO
+        ABSVAL.173.D=3F                         ;ABS VAL CHECK (SEE TABLE)              SIGN    ZERO    ZERO
+        ABSVAL.140=30                           ;ABS VAL CHECK (SEE TABLE)              SIGN    ALU0.Q1 ZERO
+        ABSVAL.141=31                           ;ABS VAL CHECK (SEE TABLE)              SIGN    ALU0.Q1 ALKC
+        ABSVAL.142=32                           ;ABS VAL CHECK (SEE TABLE)              SIGN    ALU0.Q1 ONE
+        ABSVAL.143=33                           ;ABS VAL CHECK (SEE TABLE)              SIGN    ALU0.Q1 PSLC
+        ABSVAL.150=34                           ;ABS VAL CHECK (SEE TABLE)              SIGN    ALU1.Q0 ZERO
+        ABSVAL.151=35                           ;ABS VAL CHECK (SEE TABLE)              SIGN    ALU1.Q0 ALKC
+        ABSVAL.152=36                           ;ABS VAL CHECK (SEE TABLE)              SIGN    ALU1.Q0 ONE
+        ABSVAL.153=37                           ;ABS VAL CHECK (SEE TABLE)              SIGN    ALl1.Q0 PSLC
+        ABSVAL.160=38                           ;ABS VAL CHECK (SEE TABLE)              SIGN    WBUS30  ZERO
+        ABSVAL.161=39                           ;ABS VAL CHECK (SEE TABLE)              SIGN    WBUS30  ALKC
+        ABSVAL.162=3A                           ;ABS VAL CHECK (SEE TABLE)              SIGN    WBUS30  ONE
+        ABSVAL.170=3C                           ;ABS VAL CHECK (SEE TABLE)              SIGN    PSLC    ZERO
+        ABSVAL.172=3E                           ;ABS VAL CHECK (SEE TABLE)              SIGN    PSLC    ONE
+
+        ASCIISIGN.050=14                        ;ASCII SIGN CHECK (SEE TABLE)           ZERO    ALU1.Q0 ZERO
+        ASCIISIGN.051=15                        ;ASCII SIGN CHECK (SEE TABLE)           ZERO    ALU1.Q0 ALKC
+        ASCIISIGN.052=16                        ;ASCII SIGN CHECK (SEE TABLE)           ZERO    ALU1.Q0 ONE
+        ASCIISIGN.053=17                        ;ASCII SIGN CHECK (SEE TABLE)           ZERO    ALU1.Q0 PSLC
+        ASCIISIGN.070=1C                        ;ASCII SIGN CHECK (SEE TABLE)           ZERO    PSLC    ZERO
+        ASCIISIGN.071=1D                        ;ASCII SIGN CHECK (SEE TABLE)           ZERO    PSLC    ALKC
+        ASCIISIGN.072=1E                        ;ASCII SIGN CHECK (SEE TABLE)           ZERO    PSLC    ONE
+        ASCIISIGN.073=1F                        ;ASCII SIGN CHECK (SEE TABLE)           ZERO    PSLC    PSLC
+
+        DSIZE.020=8,    .VALIDITY=<V072>        ;DSIZE<1>       DSIZE<0>                ZERO    SHF     ZERO
+        DSIZE.021=9,    .VALIDITY=<V072>        ;DSIZE<1>       DSIZE<0>                ZERO    SHF     ALKC
+        DSIZE.022=0A,   .VALIDITY=<V072>        ;DSIZE<1>       DSIZE<0>                ZERO    SHF     ONE
+        DSIZE.023=0B,   .VALIDITY=<V072>        ;DSIZE<1>       DSIZE<0>                ZERO    SHF     PSLC
+        DSIZE.030=0C,   .VALIDITY=<V072>        ;DSIZE<1>       DSIZE<0>                ZERO    ROT     ZERO
+        DSIZE.031=0D,   .VALIDITY=<V072>        ;DSIZE 1>       DSIZE<0>                ZERO    ROT     ALKC
+        DSIZE.032=0E,   .VALIDITY=<V072>        ;DSIZE<1>       DSIZE<0>                ZERO    ROT     ONE
+        DSIZE.033=0F,   .VALIDITY=<V072>        ;DSIZE<1>       DSIZE<0>                ZERO    SHF     ONE
+
+        PL.EQ.0.SIGN.120=28                     ;PL<4:0>.EQ.0   PL<5>                   SIGN    SHF     ZERO
+        PL.EQ.0.SIGN.121=29                     ;PL<4:0>.EQ.0   PL<5>                   SIGN    SHF     AlKC
+        PL.EQ.0.SIGN.122=2A                     ;PL<4:0>.EQ.0   PL<5>                   SIGN    SHF     ONE
+        PL.EQ.0.123=2B                          ;PL<4:0>.EQ.0   0                       SIGN    SHF     PSLC
+
+        BCDSIGN.040=10                          ;S<3:0>.NE.0    S<3:0>.NE.(11,13)       ZERO    ALU0 Q1 ZERO
+        BCDSIGN.041=11                          ;S<3:0>.NE.0    S<3:0>.NE.(11,13)       ZERO    ALU0.Q1 ALKC
+        BCDSIGN.042=12                          ;S<3:0>.NE.0    S<3:0>.NE.(11,13)       ZERO    ALU0.Q1 ONE
+        BCDSIGN.003=13                          ;S<3:0>.NE.0    S<3:0>.NE.(11,13)       ZERO    ALU0.Q1 PSLC
+        BCDSIGN.060=18                          ;S<3:0>.NE.0    S<3:0>.NE.(11,13)       ZERO    WBUS30  ZERO
+        BCDSIGN.061=19                          ;S<3:0>.NE.0    S<3:0>.NE.(11,13)       ZERO    WBUS30  ALKC
+        BCDSIGN.062=1A                          ;S<3:0>.NE.0    S<3:0>.NE.(11,13)       ZERO    WBUS30  ONF
+        BCDSIGN.063=1B                          ;S<3:0>.NE.0    S<3:0>.NE.(11,13)       ZERO    WBUS30  PSLC
+        VIELD.000=0                             ;SL.EQ.0        (PL<4:0>+SL).GT.32      ZERO    ZERO    ZERO
+        VIELD.001=1                             ;SL.EQ.0        (PL<4:0>+SL).GT.32      ZERO    ZERO    ALKC
+        VIELD.002=2                             ;SL.EQ.0        (PL<4:0>+SL).GT.32      ZERO    ZERO    ONE
+        VIELD.010=4                             ;SL.EQ.0        (PL<4:0>+SL).GT.32      ZERO    ONE     ZERO
+        VIELD.011=5                             ;SL.EQ.0        (PL<4:0>+SL).GT.32      ZERO    ONE     ALKC
+        VIELD.012=6                             ;SL EQ.0        (PL<4:0>+SL).GT.32      ZERO    ONE     ONE
+        VIELD.110=24                            ;SL.EQ.0        (PL<4:0>+SL).GT.32      SIGN    ONE     ZERO
+        VIELD.111=25                            ;SL.EQ.0        (PL<4:0>+SL).GT.32      SIGN    ONE     ALKC
+        VIELD.112=26                            ;SL.EQ.0        (PL<4:0>+SL).GT.32      SIGN    ONE     ONE
+
+        SL.EQ.0.SIGN.101=21                     ;SL.EQ.0        PL<5>                   SIGN    ZERO    ALKC
+        SL.LQ.0.SIGN.102=22                     ;SL.EQ.0        PL<5>                   SIGN    ZERO    ONE
+        SL.EQ.0.100=20                          ;SL.EQ.0        UNDEFINED               SIGN    ZERO    ZERO
+
+        WBRANGE.131.D=2D                        ;WBUS RANGE CHECK (SEE TABLE)           SIGN    ZERO    ZERO
+        WBRANGE.133.D=2F                        ;WBUS RANGE CHECK (SEE TABLE)           SIGN    ZERO    ZERO
+        WBRANGE.130=2C                          ;WBUS RANGE CHECK (SEE TABLE)           SIGN    ROT     ZERO
+        WBRANGE.132=2E                          ;WBUS RANGE CHECK (SEE TABLE)           SIGN    ROT     ONE
+
+        WX.NE.0.113.D=27                        ;WX<31:16>.NE.0 WX<15:0>.NE.0           SIGN    ZERO    ZERO
+        WX.NE.0.103=23                          ;WX<31:16>.NE.0 WX<15:0>.NE.0           SIGN    ZERO    PSLC
+
+        PL5.003=3                               ;0              PL<5>                   ZERO    ZERO    PSLC
+        PL5.013=7                               ;0              PL<5>                   ZERO    ONE     PSLC
+.TOC "  Machine Definition              : RSRC, SPW"
+
+RSRC/=<39:34>,.DEFAULT=0;R SCRATCH_PAD ADD CTRL RTMP=0-15,GPR=16-31,IPR=32-47
+                        ;DEFAULT TO RTMP7 FOR LIT/(LITRL,LONLIT)
+
+        TEMP0=00        ;RTMP - DUAL PORT TEMP 0
+        TEMP1=01        ;RTMP - DUAL PORT TEMP 1
+        TEMP2=02        ;RTMP - DUAL PORT TEMP 2
+        TEMP3=03        ;RTMP - DUAL PORT TEMP 3
+        TEMP4=04        ;RTMP - DUAL PORT TEMP 4
+        TEMP5=05        ;RTMP - DUAL PORT TEMP 5
+        TEMP6=06        ;RTMP - DUAL PORT TEMP 6
+        TEMP7=07        ;RTMP - DUAL PORT TEMP 7
+        TEMP8=08        ;RTMP - R S-PAD TEMP 8
+        TEMP9=09        ;RTMP - R S-PAD TEMP 9
+        TEMP10=0A       ;RTMP - R S-PAD TEMP 10
+        TEMP11=0B       ;RTMP - R S-PAD TEMP 11
+        TEMP12=0C       ;RTMP - R S-PAD TEMP 12
+        TEMP13=0D       ;RTMP - R S-PAD TEMP 13
+        MM.TEMP5=0E     ;MEMORY MANAGEMENT TEMP 5
+        MM.TEMP1=0F     ;MEMORY MANAGEMENT TEMP 1
+
+        R0=10           ;GPR  - GENERAL PURPOSE REGISTER 0
+        R1=11           ;GPR  - GENERAL PURPOSE REGISTER 1
+        R2=12           ;GPR  - GENERAL PURPOSE REGISTER 2
+        R3=13           ;GPR  - GENERAL PURPOSE REGISTER 3
+        R4=14           ;GPR  - GENERAL PURPOSE REGISTER 4
+        R5=15           ;GPR  - GENERAL PURPOSE REGISTER 5
+        R6=16           ;GPR  - GENERAL PURPOSE REGISTER 6
+        R7=17           ;GPR  - GENERAL PURPOSE REGISTER 7
+        R8=18           ;GPR  - GENERAL PURPOSE REGISTER 8
+        R9=19           ;GPR  - GENERAL PURPOSE REGISTER 9
+        R10=1A          ;GPR  - GENERAL PURPOSE REGISTER 10
+        R11=1B          ;GPR  - GENERAL PURPOSE REGISTER 11
+        R12=1C          ;GPR  - GENERAL PURPOSE REGISTER 12
+        R13=1D          ;GPR  - GENERAL PURPOSE REGISTER 13
+        SP=1E           ;GPR  - STACK POINTER
+        RTMPGPR=1F      ;GPR  - MICRO CODE TEMPORARY
+
+        KSP=20          ;IPR  - KERNEL STACT POINTER
+        ESP=21          ;IPR  - EXECUTIVE STACK POINTFR
+        SSP=22          ;IPR  - SUPERVISOR STACK POINTER
+        USP=23          ;IPR  - USER STACK POINTER
+        ISP=24          ;IPR  - INTERRUPT STACK POINTER
+        PCBB=25         ;IPR  - PROCESS CONTROL BLOCK BASE
+        MM.TEMP2=26     ;MEMORY MANAGEMENT TEMP 2
+        MM.TEMP3=27     ;MEMORY MANAGEMENT TEMP 3
+        P0BR=28         ;IPR  - P0 BASE REGISTER
+        P0LR=29         ;IPR  - P0 LENGTH REGISTER
+        P1BR=2A         ;IPR  - P1 BASE REGISTER
+        P1LR=2B         ;IPR  - P1 LENGTH REGISTER
+        SBR=2C          ;IPR  - SYSTEM BASE REGISTER
+        SlR=2D          ;IPR  - SYSTEM LENGTH REGISTER
+        SPNICR.SPICR=2E ;IPR  - N XT INTERVAL REGISTER
+        MM.TEMP4=2F     ;MEMORY MANAGEMENT TEMP 4
+        TEMP.R=30       ;RTMP INDEXED BY RNUM
+        TEMP.R+1=3C     ;RTMP INDEXED BY RNUM+1
+        TEMP.ROR1=38    ;RTMP INDEXED BY RNUM.OR.1
+        GPR.R=33        ;GPR  INDEXED BY RNUM
+        GPR.R+1=3F      ;GPR  INDEXED BY RNUM+1
+        GPR.ROR1=3B     ;GPR  INDEXED BY RNUM.OR.1
+        DST.R=31        ;GPR  INDEXED BY RNUM           INH WRT IF NOT REG MODE
+        DST.R+1=3D      ;GPR  INDEXED BY RNUM+1         INH WRT IF NOT REG MODE
+        DST.ROR1=39     ;GPR  INDEXED BY RNUM.OR.1      INH WRT IF NOT REG MODE
+        IPR.R=32        ;IPR  INDEXED BY RNUM
+        IPR.R+1=3E      ;IPR  INDEXED BY RNUM+1
+        IPR.ROR1=3A     ;IPR  INDEXED BY RNUM.OR.1
+
+        LONLIT=35       ;RBUS <- LONLIT REGISTER        DEFAULT FOR WRT = RTMP0
+        ZERO=36         ;RBUS <- 0                      DEFAULT FOR WRT = RTMP0
+        ZERO.CLRRBSP=37 ;RBUS <- 0  .  RBSP <- 0        DEFAULT FOR WRT = RTMP0
+
+SPW/=<70:69>,.DEFAULT=0 .SCRATCH PAD WRITE CONTROL
+        NOP=0                                   ;NO-OPERATION
+        RSIZE=1,        .VALIDITY=<V070>        ;WRITE SCRATCH PAD R SIZE DEPENDENT
+        RLONG=2                                 ;WRITE SCRATCH PAD R SIZE IS LONG
+        MLONG=3                                 ;WRITE SCRATCH PAD M SIZE IS LONG
+.TOC "  Machine Definition              : WCTRL"
+
+WCTRL/=<30:25>,.DEFAULT=2                       ;WBUS CONTROL
+
+                                                        ;MISC
+        NOP=2                                                   ;NO OPERATION
+        ACLOSYNC=1D,            .VALIDITY=<V080>                ;WBUS<16> <- ACLO SYNC
+        FPA.ENABLE_WB5=15                                       ;FPA ENABLE <- WBUS<5>
+        REVLEVEL=11,            .VALIDITY=<V080>                ;WBUS<23:16> <- REVISION LEVEL
+
+                                                        ;INTERRUPT AND EXCEPTIONS
+        FPTCR=03,               .VALIDITY=<V080>                ;WBUS<2:0> <- FLOATING POINT TRAP CODE REGISTER
+        ASTLVL=3A,              .VALIDITY=<V00.30.80>           ;WBUS<26:24> <- ASTLVL
+        ASTLVL_WB=38,           .VALIDITY=<V00.30>              ;ASTLVL <- WBUS<26:24>
+        SOFTIPR_WB=3C,          .VALIDITY=<V00.30>              ;SOFTWARE IPR REGISTER <- WBUS<20:16>
+        PREV_CUR.ISCUR_WB=35,   .VALIDITY=<V01.30>              ;PSL<PREV> <- PSL<CUR> . PSL<IS,CUR> <- WB<26:24>
+        PREV_WB=31,             .VALIDITY=<V00.30>              ;PSL<PREV> <- WBUS<23:22>
+        IPL_WB=3D,              .VALIDITY=<V00.30>              ;PSL<IPL> <- WBUS<20:16>
+        IPR=3F,                 .VALIDITY=<V00.30.80>           ;WBUS<20:16> <- IPL OF_HIGHEST IPR
+        UVCTR_CM.IS=10                                          ;UVCTR<3:0> <- UNP'IS'CM<1:0>
+        REICHK=37,              .VALIDITY=<V05.30>              ;REI CHECK
+        GRANT=33,               .VALIDITY=<V06.36.40>           ;ISSUE UNIBUS GRANT
+
+                                                        ;MICRO SEQUENCER FUNCTIONS
+        STEPC_WB=8                                              ;STEP COUNTER <- WBUS<4:0>
+        CM.TP FPD.F5.STEPC=0C,  .VALIDITY=<V080>                ;WBUS<31:30,27,5:0> <- PSL<CM,TP,FPD>, FLAG5, STEP COUNTER
+        FLAGS_WB=18                                             ;STATUS FLAGS <- WBUS<5:0>
+        CM.TP.FPD.FLAGS=1C,     .VALIDITY=<V080>                ;WBUS<31:30,27,5:0> <- PSL<CM.TP.FPD>, STATUS FLAGS
+
+                                                        ;TIMER CONTROL & TOD CLOCK
+        TCSR_WB=0B                                              ;TIMER CONTROL AND STATUS REG. <- WBUS<31,24:16>
+        INIR=0E,                .VALIDITY=<V080>                ;WBUS<15:0> <- INTERNAL NEXT INTERVAL_REG.
+        TCSR.IICR=0F,           .VALIDITY=<V080>                ;WBUS<31,24:16> <- TCSR . WBUS<15:0> <- IICR
+        INIR_WB=0A                                              ;INTERNAL NEXT INTERVAL REG <- WBUS<15:0>
+        TODCLK_WB=0D                                            ;TOD CLOCK <- WBUS<31:O>
+        TODCLK=9,               .VALIDITY=<V080>                ;WBUS<31:0> <- TOD CLOCK
+
+                                                        ;CONSOLE & TU58 INTERFACE CONTROL
+        LOADCRAR=12                                             ;CRAR <- WBUS<23:22>                    (SEF TABLE 2)
+        CONWRITE=16                                             ;WRITE CONSOLE REGISTER PER CRAR        (SEE TABLE 2)
+        CONREAD=1E,             .VALIDITY=<V080>                ;READ  CONSOLE REGISTER PER CRAR        (SEE TABLE 2)
+        READCRAR=1A,            .VALIDITY=<V080>                ;WBUS<31:30> <- CRAR                    (SEE TABlE 2)
+        LOADTRAR=13                                             ;TRAR <- WBUS<23:22>                    (SEE TABLE 3)
+        TU58WRITE=17                                            ;WRITE TU58 REGISTER PER TRAR           (SEE TABLE 3)
+        TU58READ=1F,            .VALIDITY=<V080>                ;READ  TU58 REGISTER PER TRAR           (SEE TABLE 3)
+        READTRAR=1B,            .VALIDITY=<V080>                ;WBUS<31:30> <- TRAR                    (SEE TABLE 3)
+
+                                                        ;ADDRESS CONTROL
+        PC_WB=24,               .VALIDITY=<V00.30.41>           ;PC <- WBUS
+        PC_PC+WB=2C,            .VALIDITY=<V00.30.41>           ;PC <- PC + WBUS
+        VA_WB=25,               .VALIDITY=<V00.30>              ;VA <- WBUS
+        VA_VA+4=22,             .VALIDITY=<V00.30>              ;VA <- VA + 4
+        VA_PC+I+W.PC_PC+I=20,   .VALIDITY=<V01.31.40.70>        ;VA <- PC+ISIZE+WBUS . PC <- PC+ISIZE
+                                                                ;(NO BUS CYCLE OR BUT XB DURING THIS CYCLE
+                                                        ;MEMORY CONTROL
+        PME=14                                                  ;PERFORMANCE MONITOR ENABLE
+        MDR_WB=23,              .VALIDITY=<V02.33>              ;MDR <- WBUS
+        MDR_0=27,               .VALIDITY=<V02.21>              ;MDR <- 0
+        MDR_IR=2B,              .VALIDITY=<V02.33.41>           ;MDR <- IR ZERO-EXTENDED
+        WDR_WB=2E,              .VALIDITY=<V02.33>              ;WDR <- WBUS ROTATED FOR LONGWORD ALIGNMENT
+        WDR_WB.UR=2A,           .VALIDITY=<V02.33>              ;WDR <- WBUS UN-ROTATED
+        MBUS_WDR=26,            .VALIDITY=<V07.37>              ;MBUS <- WDR            (NOTE: MSRC=WDR)
+        TB_WB=28,               .VALIDITY=<V11.34>              ;TRANSLATION BUFFER DATA <- WBUS
+        CLRTB.VA_WB=29,         .VALIDITY=<V10.35>              ;TB VALID BIT <- 0      (INVALIDATE BOTH GROUPS AT THE
+                                                                ;VA <- WBUS              INDEX POSITION ADDRESSED BY VA)
+        CLRCH.VA_WB=2D,         .VALIDITY=<V04.33>              ;CACHE VALID BIT <- 0   (INVALIDATE BOTH GROUPS AT THE
+                                                                ;VA <- WBUS              INDEX POSITION ADDRESSED BY VA)
+        MEMSCAR_WB=34,          .VALIDITY=<V00.30>              ;MEMORY STATUS & CONTROL ADDRESS REG <- WBUS<27:24>
+        MEMSCR=32,              .VALIDITY=<V01.32.40.80>        ;WBUS<27:24> <- MEMORY STATUS & CONTROL REG (@MSCAR)
+        MEMSCR_WB=30,           .VALIDITY=<V01.32.40>           ;MEMORY STATUS & CONTROL REG(@MEMSCAR) <- WBUS<27:24>
+
+.CREF                           ;END OF CREF ONLY WHEN FULL ASSEMBLY THE FOLLOWING WILL ALWAYS CREF
+
+
+.NOCREF                 ;SET UP FOR NEVER CREF
+.NOCREF
+
+PAR1/=<78:78>,.DEFAULT=<.NOT[.PARITY[<CC/>,<RSRC/>,<DTYPE/>,<BUT/>,<ALPCTL/>,<ROT/>,<MSRC/>,<SPW/>]]>           ;EVEN_PARITY
+PAR2/=<79:79>,.DEFAULT=<     .PARITY[<NEXT/>,<JSR/>,<CLKX/>,<FPA/>,<BUS/>,<WCTRL/>,<ISTRM/>,<MISC/>,<LIT/>]>    ;ODD_PARITY
+
+
+VSIZE/=<84:84>,.DEFAULT=0                               ;DSIZE CHECK
+.TOC "  Machine Definition              : IRD1 ROM"
+.ICODE
+.WIDTH/32
+
+
+
+; +-+-+-+-------------+-+-------------+-+-------------+-+-------------+
+; |V|V I|             |I|             |F|             |F|             |
+; |I|F|F|  IRD1.FPA   |O|    IRD1     |F|   FPD.FPA   |O|     FPD     |
+; |R"||0|             |P|             |O|             |P|             |
+; |D|D|P|             | |             |P|             | |             |
+; |1| | |             | |             | |             | |             |
+; +-+-+-+-------------+-+-------------+-+-------------+-+-------------+
+; |3|3|3|3 2 2 2 2 2 2|2|2 2 2 1 1 1 1|1|1 1 1 1 1 0 0|0|0 0 0 0 0 0 0|
+; |3|2|1|0 9 8 7 6 5 4|3|2 1 0 9 8 7 6|5|4 3 2 1 0 9 8|7|6 5 4 3 2 1 0|
+; +-+-+-+-------------+-+-------------+-+-------------+-+-------------+
+
+FPD     /=<6:0>
+FPD.FPA /=<14:8>
+IRD1    /=<22:16>
+IRD1.FPA/=<30:24>
+
+FOP /=<07:07>
+        NOP=0
+        LOD=1
+FFOP/=<15:15>
+        NOP=0
+        LOD=1
+IUP /=<23:23>
+        NOP=0
+        LOD=1
+IFUP/=<31:31>
+        N0P=0
+        LOD=1
+
+VFPD /=<32:32>,         .VALIDITY=<V060>
+VIRD1/=<33:33>,         .VALIDITY=<V061>
+.TOC "  Machine Definition              : IRDX ROM"
+.OCODE
+.WIDTH/96
+
+
+;     +---+---------------------+---------------------+---+---------------------+---------------------+
+;     | 0 |                     |                     | 0 |                     |                     |
+;     | O |                     |                     | F |                     |                     |
+;     | P |   CNT0.REG          |   CNT0.MEM          | O |    CNT0.FPA.REG     |    CNT0.FPA.MEM     |
+;     |   |                     |                     | P |                     |                     |
+;     +---+---------------------+---------------------+---+---------------------+---------------------+
+;     |4 4|4 4 4 4 4 4 3 3 3 3 3|3 3 3 3 3 2 2 2 2 2 2|2 2|2 2 1 1 1 1 1 1 1 1 1|1 0 0 0 0 0 0 0 0 0 0|
+;     |7 6|5 4 3 2 1 0 9 8 7 6 5|4 3 2 1 0 9 8 7 6 5 4|3 2|1 0 9 8 7 6 5 4 3 2 1|0 9 8 7 6 5 4 3 2 1 0|
+;     +---+---------------------+---------------------+---+---------------------+---------------------+
+;
+;
+; +-+-+---+----- ---------------+---------------------+---+---------------------+---------------------+
+; |V|V| 1 |                     |                     | 1 |                     |                     |
+; |C|C| O |                     |                     | F |                     |                     |
+; |N|N| P |   CNT1.REG          |   CNT1.MEM          | O |    CNT1.FPA.REG     |    CNT1.FPA.MEM     |
+; |T|T|   |                     |                     | P |                     |                     |
+; |1|0|   |                     |                     |   |                     |                     |
+; +-+-+---+---------------------+---------------------+---+---------------------+---------------------+
+; |9|9|9 9|9 9 9 9 8 8 8 8 8 8 8|8 8 8 7 7 7 7 7 7 7 7|7 7|6 6 6 6 6 6 6 6 6 6 5|5 5 5 5 5 5 5 5 5 4 4|
+; |7|6|5 4|3 2 1 0 9 8 7 6 5 4 3|2 1 0 9 8 7 6 5 4 3 2|1 0|9 8 7 6 5 4 3 2 1 0 9|8 7 6 5 4 3 2 1 0 9 8|
+; +-+-+---+---------------------+---------------------+---+---------------------+---------------------+
+
+CNT0.FPA.MEM/=<10:0>
+CNT0.FPA.REG/=<21:11>,  .VALIDITY=<V062>
+0FOP/=<23:22>
+        NOP=0
+        LOD=3
+
+CNTO.MEM/=<34:34>
+CNTO.REG/=<45:35>,      .VALIDITY=<V063>
+0OP /=<47:46>
+        NOP=0
+        lOD=3
+
+CNT1.FPA.MEM/=<58:48>
+CNT1.FPA.REG/=<69:59>,  .VALIDITY=<V064>
+1FOP/=<71:70>
+        NOP=0
+        LOD=3
+
+CNT1.MEM/=<82:72>
+CNT1.REG/=<93:83>,      .VALIDITY=<V065>
+1OP /=<95:94>
+        NOP=0
+        LOD=3
+
+VCNT0/=<96:96>,         .VALIDITY=<V066>
+VCNT1/=<97:97>,         .VALIDITY=<V067>
+.TOC "  Machine Definition              : COMPATABILITY ROM"
+.CCODE
+.WIDTH/66
+
+;     +---------------------+---------------------+---------- ----------+
+;     |                     |                     |                     |
+;     |      CNT1.MEM       |      CNT0.MEM       |      IRD1.MEM       |
+;     |                     |                     |                     |
+;     +---------------------+---------------------+---------------------+
+;     |3 3 3 2 2 2 2 2 2 2 2|2 2 1 1 1 1 1 1 1 1 1|1 0 0 0 0 0 0 0 0 0 0|
+;     |2 1 0 9 8 7 6 5 4 3 2|1 0 9 8 7 6 5 4 3 2 1|0 9 8 7 6 5 4 3 2 1 0|
+;     +---------------------+---------------------+---------------------+
+;
+;
+; +-+-+---------------------+---------------------+---------------------+
+; |V|V|                     |                     |                     |
+; |R|M|      CNT1.REG       |      CNT0.REG       |      IRD1.REG       |
+; |E|E|                     |                     |                     |
+; |G|M|                     |                     |                     |
+; +-+-+---------------------+---------------------+---------------------+
+; |6|6|6 6 6 6 6 6 5 5 5 5 5|5 5 5 5 5 4 4 4 4 4 4|4 4 4 4 3 3 3 3 3 3 3|
+; |7|6|5 4 3 2 1 0 9 8 7 6 5|4 3 2 1 0 9 8 7 6 5 4|3 2 1 O 9 8 7 6 5 4 3|
+; +-+-+---------------------+---------------------+---------------------+
+
+IRD1.MEM/=<10:00>
+CNT0.MEM/=<21:11>
+CNT1.MEM/=<32:22>
+
+IRD1.REG/=<43:33>
+CNT0.REG/=<54:44>
+CNT1.REG/=<65:55>
+
+VMEM/=<66:66>,          .VALIDITY=<V068>
+VREG/=<67:67>,          .VALIDITY=<V069>
+.TOC "  Machine Definition              : DSIZE ROM"
+.DCODE
+; +---+---+---+---+---+---+
+; | O | O | O | O | O | O |
+; | S | S | S | S | S | S |
+; | 6 | 5 | 4 | 3 | 2 | 1 |
+; +---+---+---+---+---+---+
+; |1 1|0 0|0 0|0 0|0 0|0 0|
+; |1 0|9 8|7 6|5 4|3 2|1 0|
+; +---+---+---+---+---+---+
+OS1/=<1:0>
+        BYTE=0
+        WORD=1
+        LONG=2
+        FLOT=2
+        QUAD=3
+        DBLE=3
+OS2/=<3:2>
+        BYTE=0
+        WORD=1
+        LONG=2
+        FLOT=2
+        QUAD=3
+        DBLE=3
+OS3/=<5:4>
+        BYTE=0
+        WORD=1
+        LONG=2
+        FLOT=2
+        QUAD=3
+        DBLE=3
+OS4/=<7:6>
+        BYTE=0
+        WORD=1
+        LONG=2
+        FLOT=2
+        QUAD=3
+        DBLE=3
+OS5/=<9:8>
+        BYTE=0
+        WORD=1
+        LONG=2
+        FLOT=2
+        QUAD=3
+        DBLE=3
+OS6/=<11:10>
+        BYTE=0
+        WORD=1
+        LONG=2
+        FLOT=2
+        QUAD=3
+        DBLE=3
+.UCODE
+.CREF
+.CREF                   ;END OF NEVER CREF THE FOLLOWING WILL ALWAYS CREF
+.TOC    "       Validity Checks                 : Combinations"
+
+.NOCREF                 ;SET UP FOR CREF ONLY WHEN FULL ASSEMBLY
+
+        .SET/V00.30      =<.AND[<V000>,<V030>]>
+        .SET/V00.30.80   =<.AND[<V000>,<V030>,<V080>]>
+        .SET/V00.30.41   =<.AND[<V000>,<V030>,<V041>]>
+        .SET/V00.71      =<.AND[<V000>,<V071>]>
+        .SET/V00.71.80   =<.AND[<V000>,<V071>,<V080>]>
+        .SET/V01.30      =<.AND[<V001>,<V030>]>
+        .SET/V01.31.40   =<.AND[<V001>,<V031>,<V040>]>
+        .SET/V01.31.40.70=<.AND[<V001>,<V031>,<V040>,<V070>]>
+        .SET/V01.32.40   =<.AND[<V001>,<V032>,<V040>]>
+        .SET/V01.32.40.80=<.AND[<V001>,<V032>,<V040>,<V080>]>
+        .SET/V02.21      =<.AND[<V002>,<V021>]>
+        .SET/V02.33      =<.AND[<V002>,<V033>]>
+        .SET/V02.33.41   =<.AND[<V002>,<V033>,<V041>]>
+        .SET/V04.33      =<.AND[<V004>,<V033>]>
+        .SET/V04.34      =<.AND[<V004>,<V034>]>
+        .SET/V04.35      =<.AND[<V004>,<V035>]>
+        .SET/V05.30      =<.AND[<V005>,<V030>]>
+        .SET/V06.36.40   =<.AND[<V006>,<V036>,<V040>]>
+        .SET/V07.37      =<.AND[<V007>,<V037>]>
+        .SET/V09.21      =<.AND[<V009>,<V021>]>
+        .SET/V10.35      =<.AND[<V010>,<V035>]>
+        .SET/V11.34      =<.AND[<V011>,<V034>]>
+        .SET/V20.70      =<.AND[<V020>,<V070>]>
+        .SET/V22.70      =<.AND[<V022>,<V070>]>
+        .SET/V24.25.70   =<.AND[<V024>,<V025>,<V070>]>
+        .SET/V21.50-54.70=<.AND[<V021>,<V050>,<V051>,<V052>,<V053>,<V054>,<V070>]>
+        .SET/V50.51.70   =<.AND[<V050>,<V051>,<V070>]>
+        .SET/V71.80      =<.AND[<V071>,<V080>]>
+.TOC    "       Validity Checks                 : WCTRL/CCPSL vs BUS Conflict States"
+        .SET/V000=<.CASE[<BUS/>]OF[1,0,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]>
+        .SET/V001=<.CASE[<BUS/>]OF[0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,1,1,0,0,0,0,1,1,1,1]>
+        .SET/V002=<.CASE[<BUS/>]OF[0,0,0,0,0,1,0,1,1,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1]>
+        .SET/V004=<.CASE[<BUS/>]OF[0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]>
+        .SET/V005=<.CASE[<BUS/>]OF[0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]>
+        .SET/V006=<.CASE[<BUS/>]OF[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]>
+        .SET/V007=<.CASE[<BUS/>]OF[0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1]>
+        .SET/V008=<.EQL[<WCTRL/>,<WCTRL/REICHK>]>
+        .SET/V009=<.EQL[<WCTRL/>,<WCTRL/GRANT>]>
+        .SET/V010=<.OR[   <.AND[  <.EQL[<BUS/>,<BUS/PRB.RD.PTE>]>  ,  <.NEQ[<BUT/>,<BUT/UVCTR>]>  ]>,
+                          <.CASE[<BUS/>]OF[0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]>   ]>
+        .SET/V011=<.OR[   <.AND[  <.EQL[<BUS/>,<BUS/PRB.RD>]>  ,  <.NEQ[<BUT/>,<bUT/UVCTR>]>  ]>,
+                          <.CASE[<BUS/>]OF[0,0,0,0,0,1,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]>   ]>
+
+.TOC    "       Validity Checks                 : BUS vs MSRC Conflict States"
+        .SET/V020=<.CASE[<MSRC/>]OF[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,<INIT>,0,0,0,0,1,1,1,0]>
+        .SET/V021=<.CASE[<MSRC/>]OF[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,     0,0,0,0,0,1,1,1,0]>
+        .SET/V022=<.CASE[<MSRC/>]OF[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,<INIT>,0,0,0,0,1,1,1,0]>
+        .SET/V023=<.CASE[<MSRC/>]OF[1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,0,0,0,0,     0,0,0,0,0,0,0,0,0]>
+        .SET/V024=<.OR[  <.NEQ[<BUT/>,<BUT/UVCTR>]>,
+                          <.CASE[<MSRC/>]OF[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,1,0]>   ]>
+        .SET/V025=<.CASE[<MSRC/>]OF[1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,     0,1,1,1,1,0,0,0,1]>
+
+.TOC    "       Validity Checks                 : WCTRL/CCPSL vs MSRC Conflict States"
+        .SET/V030=<.CASE[<MSRC/>]OF[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,1]>
+        .SET/V031=<.CASE[<MSRC/>]OF[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0]>
+        .SET/V032=<.CASE[<MSRC/>]OF[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,0,1,1,1,1,1,1,1,1]>
+        .SET/V033=<.CASE[<MSRC/>]OF[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,1,1,1,1,1,1,0]>
+        .SET/V034=<.CASE[<MSRC/>]OF[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0]>
+        .SET/V035=<.CASE[<MSRC/>]OF[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,0,1,1,1,1,1]>
+        .SET/V036=<.CASE[<MSRC/>]OF[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,1,1,1,0,1,1,1,1,1,1,1,0]>
+        .SET/V037=<.CASE[<MSRC/>]OF[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0]>
+        .SET/V038=<.EQL[<WCTRL/>,<WCTRL/MBUS_WDR>]>
+
+.TOC    "       Validity Checks                 : Buts That Take Data From XB"
+        .SET/V040=<.NEQ[<BUT/>,<BUT/IRD1>,<BUT/IRD1TST>,<BUT/LOD.INC.BRA>,<BUT/LOD.BRA>]>
+        .SET/V041=<.NEQ[<BUT/>,<BUT/IRD1>,<BUT/IRD1TST>]>
+
+.TOC    "       Validity checks                 : Special ALPCTL Functions For Multiply and Divide"
+        .SET/V050=<.EQL[<ROT/>,0]>
+        .SET/V051=<.EQL[<BUS/>,<BUS/NOP>]>
+        .SET/V052=<.NEQ[<WCTRL/>,<WCTRL/TB_WB>,<WCTRL/CLRTB.VA_WB>,<WCTRL/CLRCH.VA_WB>,<WCTRL/MDR_WB>,<WCTRL/MDR_0>,
+                                 <WCTRL/MDR_IR>,<WCTRL/WDR_WB>,<WCTRL/WDR_WB.UR>,<WCTRL/MBUS_WDR>,<WCTRL/GRANT>,
+                                 <WCTRL/REICHK>]>
+        .SET/V053=<.NEQ[<CCPSL/>,<CCPSL/MDR_OSR.CCBR_BRATST>]>
+        .SET/V054=<.NEQ[<BUT/>,<BUT/IRDX>,<BUT/IRD1>,<BUT/IRD1TST>,<BUT/LOD.INC.BRA>,<BUT/LOD.BRA>]>
+.TOC    "       Validity Checks                 : IRD Rom Checks"
+        .SET/V060=<VFPD/>
+        .SET/V061=<VIRD1/>
+        .SET/V062=<.OR[   <.EQL[<0FOP/>,<0FOP/LOD>]>   ,   <.EQL[<CNT0.FPA.MEM/>,<CNT0.FPA.REG/>]>   ]>
+        .SET/V063=<.OR[   <.EQL[<0OP/> ,<0OP/LOD>]>    ,   <.EQL[<CNT0.MEM/>    ,<CNT0.REG/>]>       ]>
+        .SET/V064=<.OR[   <.EQL[<1FOP/>,<1FOP/LOD>]>   ,   <.EQL[<CNT1.FPA.MEM/>,<CNT1.FPA.REG/>]>   ]>
+        .SET/V065=<.OR[   <.EQL[<1OP/> ,<1OP/LOD>]>    ,   <.EQL[<CNT1.MEM/>    ,<CNT1.REG/>]>       ]>
+        .SET/V066=<VCNT0/>
+        .SET/V067=<VCNT1/>
+        .SET/V068=<VMEM/>
+        .SET/V069=<VREG/>
+
+.TOC    "       Validity Checks                 : DSIZE Checks"
+        .SET/V070=<VSIZE/>
+        .SET/V071=<.OR[ <VSIZE/> , <.NEQ[<BUT/>,<BUT/CCBR>,<BUT/CCBR1.CCBR0.IR0>,<BUT/CCBR0.SRKSTAO>,<BUT/CCBR1.INT-TS>]>]>
+        .SET/V072=<.OR[ <VSIZE/> , <.NEQ[<BUT/>,<BUT/SRKSTA>,<BUT/CCBR0.SRKSTAO>]>]>
+
+.TOC    "       Validity Checks                 : Multiple WBUS Drive Checks"   ;SEE CHARTS TO DECIPHER
+        .SET/V080=<.CASE[<WBUS.DRIVE>]OF[1,1,0,1,0,1,0,0,0,0,0,0,0,0,0,0]>
+        .SET/WBUS.DRIVE=<.SUM[<ALU.GROUP>,<WCTRL.GROUP>,<OTHERS>]>
+
+.TOC    "       Validity Checks                 :       ALU Group"
+        .SET/ALU.GROUP=<.OR[  <.EQL[<LIT/>,<LIT/LONLIT>]>  ,  <WMUX>]>
+        .SET/WMUX =<.CASE[<MUX/>]OF[1,1,1,1,1,1,1,1,1,<MUX.09>,1,1,1,<MUX.0D>,1,1]>
+        .SET/MUX.09=<.CASE[<ALU/>]OF[1,1,1,1,1,1,1,1,0,0,<DQ.0>,<DQ.1>,0,0,<DQ.0>,<DQ.1>]>
+        .SET/MUX.OD=<.CASE[<ALU/>]OF[1,1,1,1,1,1,1,1,1,0,00000,00000,1,0,00001,00001]>
+        .SET/DQ.0=  <.CASE[<DQ1/>]OF[0,1,1,1]>
+        .SET/DQ.1=  <.CASE[<DQ1/>]OF[1,0,1,1]>
+
+.TOC    "       Validity Checks                 :       WCTRL Group"
+        .SET/WCTRL.GROUP =<.CASE[<WCTRL/>]OF[0,0,0,3,3,0,0,<WCTRL.07>,0,0,0,0,3,3,3,3,  0,3,0,0,0,0,0,0,0,0,3,3,3,3,3,3,
+                                             0,0,0,0,0,0,0,         0,0,0,0,0,0,0,0,0,  0,0,3,0,0,0,0,0,0,0,3,0,0,0,0,3]>
+        .SET/WCTRL.07    =<.SELECT[  <.EQL[<CCMISC/>,<CCMISC/WB_ATCR.CCBR_SIGND>]>  ,  3]>
+
+.TOC    "       Validity Checks                 :       Others"
+        .SET/OTHERS=<.OR[  <.CASE[<FPA/>]OF[0,0,0,0,5,5]>  ,
+                           <.CASE[<MSRC/>]OF[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,5,0,0,0,0,0,5,0,5,0]>  ]>
+
+.CREF                   ;END OF CREF ONLY WHEN FULL ASSEMBLY THE FOLLOWING WILL ALWAYS CREF
+.BIN

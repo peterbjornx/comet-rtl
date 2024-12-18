@@ -1,0 +1,19 @@
+DEC VAX-11/750 CPU RTL Model
+
+This repository contains reverse engineered RTL for the gate arrays in
+the DEC COMET (VAX-11/750) as well as verilog models of the circuit boards making up that minicomputer.
+
+The tree is set up as following:
+
+src\
+src\dpm          - Data Path Module (circuit board)
+src\dpm\logic_ic - Logic IC models for jellybean parts found on the board
+src\dpm\alk      - Model for the ALK chip from reverse engineering
+
+inc\             - Verilog headers
+doc
+doc\             - Documentation
+ucode\           - Microcode definitions files transcribed/OCRed from CMT098 microfiche set.
+
+Microcode transcription project will be kept in a separate repository
+ to keep the source control history clean here
