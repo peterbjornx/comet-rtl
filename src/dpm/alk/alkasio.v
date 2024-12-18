@@ -53,8 +53,4 @@ module alkasio(
 	/* Shift input for SHL */
 	assign alu_sout_shl_h  = ~alu_sio0_in_l;
 	
-	assign q_sout_shr_h = ~  q_sio0_in_l;
-INOUT_CELL_OD_NOCTL_NODIODE_2IN PAD_2( IN1: alu_shl_en_h, IN2: alu_sin_h, OUT: alu_sout_shr_h );
-INOUT_CELL_OD_NOCTL_DIODE_2IN PAD_3( IN1: alu_shr_en_h, IN2: alu_sin_h, OUT: alu_sout_shl_h );
-
 endmodule
