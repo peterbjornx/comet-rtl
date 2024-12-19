@@ -58,7 +58,7 @@ module alkqsmux(
 	input  loopf_h, /* was loopf_q_l_b */
 	
 	/* WBUS */
-	input  [31] wbus_in_h,
+	input  wb31_in_h,
 	
 	/* Pre-gated WBUS[30]/PSLC */
 	input  aq_sin_pslc_wb30_l,
@@ -80,7 +80,7 @@ module alkqsmux(
 		  /* Shift,  ALU SR, Q SR: ALU SIO[0]    -> Q SHIFT IN */
 		  ~(alu_sout_shr_h & alushf_dec_shf_h & alu_shr_op_h & dq_q_shr_h ) &
 		  /* ALUSHF              : 1             -> Q SHIFT IN */
-		  ~( 1'b1          & alushf_dec_qsi1_l );
+		  ~( 1'b1          & ~alushf_dec_qsi1_l );
 
 	wire   q_sin_b_l =
 		  /* Divide or remainder:  Carry[32]     -> Q SHIFT IN */
@@ -97,7 +97,7 @@ module alkqsmux(
 	/* Pad logic for WBUS[31] plus two NANDS */
 	wire   q_sin_noalu_l = 
 	      /* Shift, no ALU shift:  WBUS[31]      -> Q SHIFT IN */
-		  ~(wbus_in_h[31] & q_sin_wb31_gate_h) &
+		  ~(wb31_in_h    & q_sin_wb31_gate_h) &
 		  /* Rotate, no ALU, Q SR: Q SIO[0]      -> Q SHIFT IN */
 		  ~(q_sout_shr_h & alushf_dec_rot_h & alu_shift_op_l & dq_q_shr_h) &
 		  /* Rotate, no ALU, Q SL: Q SIO[SIZE-1] -> Q SHIFT IN */
