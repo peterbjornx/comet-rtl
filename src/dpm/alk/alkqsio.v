@@ -103,10 +103,10 @@ module alkqsio(
 	
 	/* Pad output logic for Q_SIO[31,15,7] */
 	/* Effectively this drives q_sin_h onto the correct Q_SIO */
-	assign q_sio0_out_l  = q_sin_h & q_shl_en_h  ; /* SHR  , sin->Q[0]  */
-	assign q_sio7_out_l  = q_sin_h & q_shr8_en_h ; /* SHL8 , sin->Q[7]  */
-	assign q_sio15_out_l = q_sin_h & q_shr16_en_h; /* SHL16, sin->Q[15] */
-	assign q_sio31_out_l = q_sin_h & q_shr32_en_h; /* SHL32, sin->Q[31] */
+	assign q_sio0_out_l  = q_sin_h & q_shl_en_h  ; /* SHL  , sin->Q[0]  */
+	assign q_sio7_out_l  = q_sin_h & q_shr8_en_h ; /* SHR8 , sin->Q[7]  */
+	assign q_sio15_out_l = q_sin_h & q_shr16_en_h; /* SHR16, sin->Q[15] */
+	assign q_sio31_out_l = q_sin_h & q_shr32_en_h; /* SHR32, sin->Q[31] */
 	
 	
 	/* Pad wire-and logic for Q_SIO[31,15,7] */

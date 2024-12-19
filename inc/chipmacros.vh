@@ -11,7 +11,11 @@
 `define FF_EN_P(Clk, En, Data, Out) \
 	always @ ( posedge Clk )        \
 		if ( En )                   \
-			Out <= Data;      
+			Out <= Data;    
+
+`define FF_P(Clk, Data, Out) \
+	always @ ( posedge Clk )        \
+		Out <= Data;      
 
 `define FF_EN_N(Clk, En, Data, Out) \
 	always @ ( negedge Clk )        \
