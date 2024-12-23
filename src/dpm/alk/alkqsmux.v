@@ -34,8 +34,8 @@
  
 module alkqsmux(	
 	/* DQ field decode outputs */
-	input dq_q_shl_h,           /* DQ field specifies Q shift left  */
-	input dq_q_shr_h,           /* DQ field specifies Q shift right */
+	input dq_q_shl_l,           /* DQ field specifies Q shift left  */
+	input dq_q_shr_l,           /* DQ field specifies Q shift right */
 	
 	/* ALUSHF field decode outputs */
 	input alushf_dec_qsi1_l,    /* ALUSHF dictates 1 -> Q shift in  */
@@ -78,7 +78,7 @@ module alkqsmux(
 	      /* Rotate, ALU SL      : ALU SIO[31]   -> Q SHIFT IN */
 	      ~(alu_sout_shl_h & alushf_dec_rot_h & alu_shl_op_h ) &
 		  /* Shift,  ALU SR, Q SR: ALU SIO[0]    -> Q SHIFT IN */
-		  ~(alu_sout_shr_h & alushf_dec_shf_h & alu_shr_op_h & dq_q_shr_h ) &
+		  ~(alu_sout_shr_h & alushf_dec_shf_h & alu_shr_op_h & ~dq_q_shr_l ) &
 		  /* ALUSHF              : 1             -> Q SHIFT IN */
 		  ~( 1'b1          & ~alushf_dec_qsi1_l );
 
@@ -99,9 +99,9 @@ module alkqsmux(
 	      /* Shift, no ALU shift:  WBUS[31]      -> Q SHIFT IN */
 		  ~(wb31_in_h    & q_sin_wb31_gate_h) &
 		  /* Rotate, no ALU, Q SR: Q SIO[0]      -> Q SHIFT IN */
-		  ~(q_sout_shr_h & alushf_dec_rot_h & alu_shift_op_l & dq_q_shr_h) &
+		  ~(q_sout_shr_h & alushf_dec_rot_h & alu_shift_op_l & ~dq_q_shr_l) &
 		  /* Rotate, no ALU, Q SL: Q SIO[SIZE-1] -> Q SHIFT IN */
-		  ~(q_sout_shl_h & alushf_dec_rot_h & alu_shift_op_l & dq_q_shl_h);
+		  ~(q_sout_shl_h & alushf_dec_rot_h & alu_shift_op_l & ~dq_q_shl_l);
 	
 	/* Combine the different terms */
 	assign q_sin_h = 
