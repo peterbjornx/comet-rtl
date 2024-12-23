@@ -17,6 +17,15 @@
 	always @ ( posedge Clk )        \
 		Out <= Data;      
 
+`define FF_PRESET_P(Clk, Preset, Data, Out) \
+	always @ ( posedge Clk or negedge Preset ) \
+		begin \ 
+		 if( Preset == 1'b1 ) \
+		    Out <= 1'b1; \
+		 else \
+		    Out <= Data; \
+		end     
+
 `define FF_EN_N(Clk, En, Data, Out) \
 	always @ ( negedge Clk )        \
 		if ( En )                   \
