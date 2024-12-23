@@ -35,13 +35,22 @@
  ********************************************************************/
  
 module alkasmux(
+	
+	/* ROT.ALUSHF microop field */
+	input  [2:0] alushf_h,
+	
 	/* MUX field decoded signals */
 	input  dq_dq1_h, /* was dq_dq2_dq3_l (apply DQ1 map for DQ field) */
 	
 	/* DQ field decode outputs */
-	input dq_q_shl_h,           /* DQ field specifies Q shift left  */
-	input dq_q_shr_h,           /* DQ field specifies Q shift right */
+	input dq_q_shl_l,           /* DQ field specifies Q shift left  */
+	input dq_q_shr_l,           /* DQ field specifies Q shift right */
 	
+	/* ALU field decode outputs */
+	input alu_shl_op_h,
+	input alu_shr_op_h,
+	input alu_x0xx_l,
+
 	/* ALUSHF field decode outputs */
 	input alushf_force_sout0_h, /* ALUSHF dictates 0 -> A shift in  */
 	input alushf_dec_asi1_l,    /* ALUSHF dictates 1 -> A shift in  */
@@ -50,11 +59,9 @@ module alkasmux(
 	input alushf_dec_wbus30_h,  /* ALUSHF specifies WBUS[30] shift in */
 	
 	/* ALPCTL field decode outputs */
-	input  alpctl_div_divdbl_l,
 	input  alpctl_divdbl_l,
 	input  alpctl_mul_l,
-	input  alpctl_div_h_b,
-	input  alpctl_div_h,
+	input  alpctl_div_l,
 	input  alpctl_rem_l,
 	
 	/* ALU Carry In */
@@ -84,8 +91,7 @@ module alkasmux(
 	input  q_sout_shr_h,
 	
 	/* Shift output (to Q shifter routing) */
-	output alu_sin_h,
-	);
+	output alu_sin_h );
 	
 	/* EEK: this does not match the CPU TD document */
 	wire asin_mux_aluso_gate_h = ~alpctl_divdbl_l | ~alpctl_rem_l;
@@ -94,29 +100,29 @@ module alkasmux(
 		/* Multiply +, LOOPF=1 :    Carry[32]     -> A SHIFT IN */
 		 ~(c32_in_h       &  ~alpctl_mul_l & alu_x0xx_l & loopf_h ) &
 		/* Divide              :    Q SIO[SIZE-1] -> A SHIFT IN */
-		 ~(q_sout_shl_h   &  alpctl_div_h_b       ) &
+		 ~(q_sout_shl_h   &  ~alpctl_div_l        ) &
 		/* DIVDBL or REM       :    ALUSO         -> A SHIFT IN */
-		 ~(aluso_ff_q_h   &  asin_mux_aluso_gate_h) &
+		 ~(aluso_h        &  asin_mux_aluso_gate_h) &
 		/* Rotate, ALU SL, No Q: ALU SIO[31]      -> A SHIFT IN */
 		 ~(alu_sout_shl_h &  alushf_dec_rot_h & alu_shl_op_h & dq_dq1_h );
 		 
 	wire alu_sin_l_b = 
 		/* Shift , ALU   , Q nR: Q SIO[SIZE-1]   -> A SHIFT IN */
-		 ~(q_sout_shl_h   &  alushf_dec_shf_h & ~dq_q_shr_h ) &
+		 ~(q_sout_shl_h   &  alushf_dec_shf_h &  dq_q_shr_l ) &
 		/* Rotate, ALU   , Q SL: Q SIO[SIZE-1]   -> A SHIFT IN */
-		 ~(q_sout_shl_h   &  alushf_dec_rot_h &  dq_q_shl_h ) &
+		 ~(q_sout_shl_h   &  alushf_dec_rot_h & ~dq_q_shl_l ) &
 		/* ALUSHF              : 1               -> A SHIFT IN */
 		~( 1'b1           & ~alushf_dec_asi1_l);
 		 
 	wire alu_sin_l_c = 
 		/* Shift , ALU SL, Q SR : Q SIO[0]       -> A SHIFT IN */
-		 ~(q_sout_shr_h   &  alushf_dec_shf_h &  dq_q_shr_h & alu_shl_op_h ) &
+		 ~(q_sout_shr_h   &  alushf_dec_shf_h & ~dq_q_shr_l & alu_shl_op_h ) &
 		/* Rotate,         Q SR : Q SIO[0]       -> A SHIFT IN */
-		 ~(q_sout_shr_h   &  alushf_dec_rot_h &  dq_q_shr_h ) &
+		 ~(q_sout_shr_h   &  alushf_dec_rot_h & ~dq_q_shr_l ) &
 		/* Rotate, ALU SR, No Q : ALU SIO[0]     -> A SHIFT IN */
 		~( alu_sout_shr_h &  alushf_dec_rot_h &  dq_dq1_h   & alu_shr_op_h  );
 
-	wire aq_sin_pslc_l = ~(pslc_flag_h & (rot_h[4:2] ^~ 3'b_111__))
+	wire aq_sin_pslc_l = ~(pslc_flag_h & (alushf_h ^~ 3'b111));
 	
 	/* Merged in WBUS[30] pad logic */
 	assign aq_sin_pslc_wb30_l = ~(
@@ -131,5 +137,5 @@ module alkasmux(
 			( ~alu_sin_l_a |
 			  ~alu_sin_l_b |
 			  ~alu_sin_l_c |
-			  ~aq_sin_pslc_wb30_l);
+			  ~aq_sin_pslc_wb30_l));
 endmodule
