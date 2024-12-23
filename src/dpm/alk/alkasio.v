@@ -37,16 +37,18 @@ module alkasio(
 	input  alu_sio0_in_l,
 	input  alu_sio31_in_l,
 	
-	/* ALU_SIO[] pad outputs ( open drain, 1 means pull down ) */
+	/* ALU_SIO[] pad outputs ( open drain ) */
 	output alu_sio0_out_l,
-	output alu_sio31_out_l
-
-)
+	output alu_sio31_out_l );
+	
 	/* Pad output logic for ALU_SIO[31,0] */
 	/* Effectively this drives q_sin_h onto the correct ALU_SIO */
 	assign alu_sio0_out_l  = alu_sin_h & alpctl_shl_op_h; /* SHL, sin->ALU[0]  */
 	assign alu_sio31_out_l = alu_sin_h & alpctl_shr_op_h; /* SHR, sin->ALU[31] */
 	
+	`OPENDRAIN_DRV( alpctl_shl_op_h, 1, alu_sio0_out_l  , ~alu_sin_h ) /* SHL, sin->ALU[0]  */
+	`OPENDRAIN_DRV( alpctl_shr_op_h, 1, alu_sio31_out_l , ~alu_sin_h ) /* SHR, sin->ALU[31] */
+		
 	/* Shift input for SHR */
 	assign alu_sout_shr_h  = ~alu_sio31_in_l;
 	
