@@ -49,10 +49,10 @@ module alparray(
 	input            a_si31_l,
 	/* Shift output for bit 31 (SHL) */
 	output           a_so31_l,
-	/* Shift output for bit 0  (SHR) */
-	output           a_so0_l, 
 	/* Shift input  for bit 0  (SHL) */
 	input            a_si0_l,
+	/* Shift output for bit 0  (SHR) */
+	output           a_so0_l, 
 	
 	/* ----- Q Shifter ----- */
 	/* Shift input  for bit 31 (SHR) */
