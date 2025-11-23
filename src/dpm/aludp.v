@@ -25,10 +25,6 @@ module aludp(
 	/* Data Size */
 	input      [1:0] dsize_h,
 
-    /* ----- From SRK ----- */
-	
-	input      [1:0] shf_l,
-
 	/* ----- Data buses    ----- */
 	
 	/* Write Bus (Input) */
@@ -42,9 +38,12 @@ module aludp(
 	
 	/* Memory Bus */
 	input      [31:0] mbus_l,
-	
-	/* Super-Rotator Bus */
-	input      [34:0] sbus_h,
+
+	/* Literal bus */
+	input      [8:0]  litrl_h,
+
+ 	/* SRK Status */
+	output     [1:0]  srk_sta_h,
 
     /* Control outputs */
 	output            spwb_en_h,
@@ -79,9 +78,19 @@ module aludp(
 	wire [31:0]  wbus_h;
 	wire [31:0]  _alp_wbus_h;
 	wire [31:30] _alk_wbus_h;
+	
+	/* Super-Rotator Bus */
+	wire [35:0] sbus_h;
+	wire [35:0] _srk_sbus_h;
+	wire [35:0] _srm_sbus_h;
+
+	wire [11:0] _litrl_h;
 
 	/* [] */
 	wire [9:0] alp_opc_h; /* ALPCTL / ALK OP */
+	wire [4:0] shf_l;
+	wire [1:0] pri_l;
+	wire [5:0] sec_l;
 
 	/* ALU Flag routing */
 	wire [3:0] aluv_h;
@@ -100,6 +109,92 @@ module aludp(
 	/* Inout busses */
 	assign wbus_h     = wbus_h_in & wbus_h_out; //TODO: Outside??
 	assign wbus_h_out = _alp_wbus_h & {_alk_wbus_h, {30{1'b1}}};
+	
+	assign sbus_h = {1'b0, _srk_sbus_h[34:0] & _srm_sbus_h[34:0]};
+
+	assign _litrl_h = { {3{sec_l[0]}}, litrl_h };
+
+	dc614_srk SRK (
+		.qd_clk_l(qd_clk_l),
+		.wbus_h(wbus_h[7:0]),
+		.rot_h(rot_h),
+		.wmuxz_h(wmuxz_h),
+		.dsize_h(dsize_h),
+		.sta_h(srk_sta_h),
+		.shf_l(shf_l),
+		.pri_l(pri_l),
+		.sec_l(sec_l),
+		.sbus_h(sbus_h[7:0]),
+		.sbus_out_h(_srk_sbus_h[7:0])
+	);
+
+	assign _srk_sbus_h[34:8] = {27{1'b1}};
+
+	`define SBUS_EXT( Bus, Off ) { \
+		Bus[32 + Off], Bus[28 + Off], Bus[24 + Off], Bus[20 + Off], Bus[16 + Off], \
+		Bus[12 + Off], Bus[ 8 + Off], Bus[ 4 + Off], Bus[ 0 + Off] }
+
+	`define NYB_EXT( Bus, Off ) { \
+		Bus[28 + Off], Bus[24 + Off], Bus[20 + Off], Bus[16 + Off], \
+		Bus[12 + Off], Bus[ 8 + Off], Bus[ 4 + Off], Bus[ 0 + Off] }
+
+	`define LIT_EXT( Bus, Off ) { Bus[ 8 + Off], Bus[ 4 + Off], Bus[ 0 + Off] }
+
+	dc613_srm SRM0 (
+		.phase_h(dp_phase_h),
+		.rbus_l(`NYB_EXT(rbus_l, 0)),
+		.mbus_l(`NYB_EXT(mbus_l, 0)),
+		.mbxx_l(1'b1),
+		.litrl_h(`LIT_EXT(_litrl_h, 0)),
+		.cid_l(~2'd0),
+		.mb31_l(mbus_l[31]),
+		.shf_l(shf_l[4:2]),
+		.pri_l(pri_l),
+		.sec_l(sec_l),
+		.sbus_h(`SBUS_EXT(sbus_h, 0)),
+		.sbus_out_h(`SBUS_EXT(_srm_sbus_h, 0)) );
+
+	dc613_srm SRM1 (
+		.phase_h(dp_phase_h),
+		.rbus_l(`NYB_EXT(rbus_l, 1)),
+		.mbus_l(`NYB_EXT(mbus_l, 1)),
+		.mbxx_l(mbus_l[9]),
+		.litrl_h(`LIT_EXT(_litrl_h, 1)),
+		.cid_l(~2'd1),
+		.mb31_l(mbus_l[31]),
+		.shf_l(shf_l[4:2]),
+		.pri_l(pri_l),
+		.sec_l(sec_l),
+		.sbus_h(`SBUS_EXT(sbus_h, 1)),
+		.sbus_out_h(`SBUS_EXT(_srm_sbus_h, 1)) );
+
+	dc613_srm SRM2 (
+		.phase_h(dp_phase_h),
+		.rbus_l(`NYB_EXT(rbus_l, 2)),
+		.mbus_l(`NYB_EXT(mbus_l, 2)),
+		.mbxx_l(mbus_l[10]),
+		.litrl_h(`LIT_EXT(_litrl_h, 2)),
+		.cid_l(~2'd2),
+		.mb31_l(mbus_l[31]),
+		.shf_l(shf_l[4:2]),
+		.pri_l(pri_l),
+		.sec_l(sec_l),
+		.sbus_h(`SBUS_EXT(sbus_h, 2)),
+		.sbus_out_h(`SBUS_EXT(_srm_sbus_h, 2)) );
+
+	dc613_srm SRM3 (
+		.phase_h(dp_phase_h),
+		.rbus_l(`NYB_EXT(rbus_l, 3)),
+		.mbus_l(`NYB_EXT(mbus_l, 3)),
+		.mbxx_l(mbus_l[11]),
+		.litrl_h(`LIT_EXT(_litrl_h, 3)),
+		.cid_l(~2'd3),
+		.mb31_l(mbus_l[31]),
+		.shf_l(shf_l[4:2]),
+		.pri_l(pri_l),
+		.sec_l(sec_l),
+		.sbus_h(`SBUS_EXT(sbus_h, 3)),
+		.sbus_out_h(`SBUS_EXT(_srm_sbus_h, 3)) );
 		
 	/* ALU */
 	alparray alps(
@@ -110,10 +205,10 @@ module aludp(
 		.wbus_h_out  ( _alp_wbus_h ),
 		.rbus_l      ( rbus_l ), 
 		.mbus_l      ( mbus_l ),
-		.sbus_h      ( sbus_h ),
+		.sbus_h      ( sbus_h[34:0] ),
 		/* Control signals */
 		.opc_h       ( alp_opc_h ),
-		.shf_l       ( shf_l ),
+		.shf_l       ( shf_l[1:0] ),
 		.x_15_08_en_l( x_15_08_en_l ),
 		.d_size_h    ( dsize_h ),
 		.rot_5_h     ( rot_h[5] ),
@@ -159,7 +254,7 @@ module aludp(
 	wire e35_3  = ~alu_c31_l;
 	wire alk_c31_in_l = ~(e35_11 & e35_3);
 
-	dc615_alk dc615_alk_instance (
+	dc615_alk ALK (
 		.qdck_l     (qd_clk_l),
 		.alpctl_h   (alpctl_h),
 		.rot_h      (rot_h),
@@ -192,19 +287,19 @@ module aludp(
 		.dbl_h      (double_enable_h),
 		.alk_op_64_h(alp_opc_h[6:4]),
 		.alk_op_10_h(alp_opc_h[1:0]),
-		.wbus_h     (wbus_h),
+		.wbus_h     (wbus_h[31:30]),
 		.wbus_h_out (_alk_wbus_h),
 		.cout_l     (alk_cout_l)
 	);
 
-	assign alp_opc_h[9:5] = alpctl_h[9:5];
+	assign alp_opc_h[9:7] = alpctl_h[9:7];
 	assign alp_opc_h[3:2] = alpctl_h[3:2];
     wire cla_sb_h = 1'b1;
     wire cla_muxa_h = 1'b1;
     wire cla_bin8_l, cla_bcd8_l;
     wire non_bcd_h;
 
-    dc612_cla cla(
+    dc612_cla CLA(
         .p_l   ( p_l ),
         .g_a_l ( g_l ),
         .g_b_l ( g_l ),
