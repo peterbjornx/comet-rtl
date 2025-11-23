@@ -1,3 +1,4 @@
+`include "chipmacros.vh"
 module alparray(
 	/* ----- Clocks ----- */
 	/* QD Clock? */
@@ -161,20 +162,20 @@ assign wmuxz_h      = _alp_zl_h & _alp_zh_h;
 	.q_so0_l   (_alp_q_shr_l[(Ny)]),              \
 	.q_si0_l   (q_sio_l[(Ny)])             
 
+`define ALP_BYTE_SLICE(i) \
+	dc608_alp alp_``i``l( \
+			`ALP_MAP(i), \
+			.z_h    (_alp_zl_h[i / 2]), \
+			.v_h()); \
+		\
+	dc608_alp alp_``i``h( \
+		`ALP_MAP(i + 1), \
+		.z_h    (_alp_zh_h[i / 2]), \
+		.v_h    (aluv_h   [i / 2])); \
 
-generate
-	for( i = 0; i < 8; i += 2 ) begin
-	
-		dc608_alp alp_l_slice(
-			`ALP_MAP(i),
-			.z_h    (_alp_zl_h[i / 2]));
-		
-		dc608_alp alp_h_slice(
-			`ALP_MAP(i + 1),
-			.z_h    (_alp_zh_h[i / 2]),
-			.v_h    (aluv_h   [i / 2]));
-	
-	end
-endgenerate
+`ALP_BYTE_SLICE(0)
+`ALP_BYTE_SLICE(2)
+`ALP_BYTE_SLICE(4)
+`ALP_BYTE_SLICE(6)
 	
 endmodule
