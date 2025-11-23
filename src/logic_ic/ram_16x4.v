@@ -4,16 +4,20 @@
 module ram_16x4 (
 	input      [3:0] A,
 	input      [3:0] D,
-	output reg [3:0] nQ, //actually tristate
+	output     [3:0] nQ, //actually tristate
 	input            nWE,
 	input            nCS);
 
 reg [3:0] stor [0:15];
+integer j;
 
 assign nQ = (!nCS) ? (~stor[A]) : {4'b1111};
 
 always @(nCS or nWE)
   if (!nCS && !nWE)
-    stor[A] = D;
+    stor[A] <= D;
 
+initial 
+  for(j = 0; j < 16; j = j+1) 
+    stor[j] = 4'b0;
 endmodule
