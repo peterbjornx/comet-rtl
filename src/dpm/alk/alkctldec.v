@@ -60,9 +60,9 @@ module alkctldec(
 	/*********************************************************************/
 	wire   dbl_pg_h = 
 	    /* Inhibit if ALPCTL=xxxx_xxx1_x1 */
-		~( &({alpctl_h[2],alpctl_h[0]}) ^~ 2'b_______1_1) &
+		~( &({alpctl_h[2],alpctl_h[0]} ^~ 2'b_______1_1)) &
 		/* Inhibit if ALPCTL=xxxx_xxx0_x0 */
-		~( &({alpctl_h[2],alpctl_h[0]}) ^~ 2'b_______0_0) &
+		~( &({alpctl_h[2],alpctl_h[0]} ^~ 2'b_______0_0)) &
         /* Inhibit if ALPCTL=xxx0_xxxx_xx */
 		~( &alpctl_h[6]);
 		
@@ -72,7 +72,7 @@ module alkctldec(
 	/* Thus, matches 2{6,7}{9,C} = {MUL,DIV}FAST{P,N} loop cycles */
 	assign muldiv_fast_l =
 		~(dbl_pg_h & alu_0xxx_l & loop_flag_h &
-		&({alpctl_h[9:7],alpctl_h[3],alpctl_h[1]}) ^~ 5'b100___1_1_);
+		&({alpctl_h[9:7],alpctl_h[3],alpctl_h[1]} ^~ 5'b100___1_1_));
 	
 	/*********************************************************************/
 	/* Multiply / divide / remainder group decodes                       */
@@ -100,7 +100,7 @@ module alkctldec(
 	/* Matches ALPCTL=1001_1x11_11 ( 2{6,7}F     UC_ALPCTL_DIVD{A,S}) */
 	assign divdbl_l =
 		~(alpctl_1001_1x1x_xx_h & 
-		&(alpctl_h[2:0]   ^~ 2'b_______111));
+		&(alpctl_h[2:0]   ^~ 3'b_______111));
 	
 	/* Matches the MUL,DIV,DIVD,REM instructions */
 	assign mul_group_h = ~(mul_l & divdbl_l & div_l & rem_l);

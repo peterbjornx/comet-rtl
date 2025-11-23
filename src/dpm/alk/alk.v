@@ -21,7 +21,7 @@ module dc615_alk( // @suppress "Design unit name 'dc615_alk' does not match file
 	input            llit_l,
 	
 	/* Carry input */
-	input            c31_h,
+	input            c31_l,
 	
 	/* Shift in-out */
 	
@@ -82,7 +82,7 @@ module dc615_alk( // @suppress "Design unit name 'dc615_alk' does not match file
 	/* Carry out */
 	output           cout_l );
 	
-	wire c32_in_h = c31_h;
+	wire c32_in_h = ~c31_l;
 	
 	wire loop_flag_h, aluso_flag_h, alkc_flag_h;
 	
@@ -368,7 +368,7 @@ module dc615_alk( // @suppress "Design unit name 'dc615_alk' does not match file
 		.qdclk_l(qdck_l), /* was qdclk_l_a */
 
 		/* Control signals */
-		.alpctl_h(alpctl_h),
+		.alpctl_h(alpctl_h[6:0]),
 		.alu_0xxx_l(alu_0xxx_l),
 		.alu_x0xx_l(alu_x0xx_l),
 		.alpctl_divdbl_l(alpctl_divdbl_l),
@@ -383,7 +383,7 @@ module dc615_alk( // @suppress "Design unit name 'dc615_alk' does not match file
 		.alkop_10_h(alk_op_10_h),
 		.alkop_64_h(alk_op_64_h),
 
-		.c32_in_h(c31_h),
+		.c32_in_h(c32_in_h),
 		.q_sout_shr_h(q_sout_shr_h),
 	
 		/* Loop flag */

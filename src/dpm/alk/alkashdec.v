@@ -32,7 +32,7 @@ module alkashdec(
 	assign op_qsi1_l   = ~&(alushf_h      ^~ 3'b001) &
 	                             ~&(alushf_h      ^~ 3'b100);
 								 
-	assign op_asi1_l   = ~&(alushf_h[1:0] ^~ 3'b_01);
+	assign op_asi1_l   = ~&(alushf_h[1:0] ^~ 2'b_01);
 	
 	assign op_wbus30_h =  &(alushf_h      ^~ 3'b110);
 

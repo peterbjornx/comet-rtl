@@ -36,7 +36,7 @@ module alkaluf(
 	
 	output aluso_flag_h );
 	
-	reg aluso_ff_q_h;
+	reg aluso_ff_q_h = 1'b0;
 	
 	/* ALUSO input mux */
 	wire aluso_ff_d_l = 

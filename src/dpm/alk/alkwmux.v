@@ -11,6 +11,7 @@
  * Author:  Unknown DEC engineer ( Original design )
  * Author:  Peter Bosch ( Reverse engineered from chip micrographs )
  ********************************************************************/
+ `include "chipmacros.vh"
  
 module alkwmux(
 	input          alpctl_wb_aluf_h,
@@ -19,7 +20,7 @@ module alkwmux(
 	input          alkc_flag_h,
 	input          aluso_flag_h,
 	input          loop_flag_h,
-	output [31:30] wbus_out_h );
+	output reg [31:30] wbus_out_h );
 
 	wire [31:30] wmux_l;
 	wire [31:30] wmux_h = ~wmux_l;
@@ -28,7 +29,7 @@ module alkwmux(
 						~(loop_flag_h  & alpctl_wb_loopf_h );
 						
 	assign wmux_l[31] = ~(aluso_flag_h & alpctl_wb_aluf_h  );
-	
-	`TRISTATE_DRV( alpctl_wb_group_ld, 2, wbus_out_h, wmux_h )
+	wire wmux_oe_h = ~ alpctl_wb_group_ld;
+	`TRISTATE_DRV( wmux_oe_h, 2, wbus_out_h, wmux_h )
 	
 endmodule

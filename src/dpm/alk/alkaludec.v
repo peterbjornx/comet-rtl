@@ -44,17 +44,17 @@ module alkaludec(
 	/* Matches subtract (regular and reversed operands) even when forced by long_lit */
 	wire       sub_op_l   = ~( long_lit_l & &(alu_h[3:2] ^~ 2'b00__)) &
 	                        ~( long_lit_l & &(alu_h[3:0] ^~ 4'b1100)) &
-	                        ~(~long_lit_l | &(alu_h[1:0] ^~ 4'b__00));
+	                        ~(~long_lit_l | &(alu_h[1:0] ^~ 2'b__00));
 	assign     sub_op_h   = ~sub_op_l;
 	
 	/* Matches ALU=001x,011x,101x (*.SL, *.SR) (predicated on not LONG_LIT) */
 	assign     shift_op_l = ~(alu_11xx_l  &  (alu_h[1]   ^~ 1'b__1_));
 	
 	/* Matches ALU=0011,0111,1011 (*.SL) (predicated on not LONG_LIT) */
-	assign     shl_op_h   = (alu_11xx_l  & &(alu_h[1:0] ^~ 1'b__11));
+	assign     shl_op_h   = (alu_11xx_l  & &(alu_h[1:0] ^~ 2'b__11));
 	
 	/* Matches ALU=0010,0110,1010 (*.SR) (predicated on not LONG_LIT) */
-	assign     shr_op_h   = (alu_11xx_l  & &(alu_h[1:0] ^~ 1'b__10));
+	assign     shr_op_h   = (alu_11xx_l  & &(alu_h[1:0] ^~ 2'b__10));
 	
 	/* Matches ALU=0x01 (*.BCD) (predicated on not LONG_LIT) */
 	assign     bcd_op_l   = ~&(~alu_0x0x_l & alu_h[0]);

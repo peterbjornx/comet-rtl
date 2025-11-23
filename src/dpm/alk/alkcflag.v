@@ -47,7 +47,7 @@ module alkcflag(
 	
 	output alkc_flag_h );
 	
-	reg alkc_ff_q_h;
+	reg alkc_ff_q_h = 1'b0;
 	
 	/* Matches valid SUBtract ops, excluding overlapping encodings */
 	wire   is_sub_op_l = 

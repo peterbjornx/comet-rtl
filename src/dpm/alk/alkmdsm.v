@@ -4,7 +4,7 @@
  * Project: COMET / DEC VAX-11/750
  * Board:   DPM (Datapath module of CPU)
  * Chip:    DC615 ALK ( ALU Control )
- * FUB:     alkmdsm (Multiply/Divide state maching / ALKCTL op gen)
+ * FUB:     alkmdsm (Multiply/Divide state machine / ALKCTL op gen)
  * Purpose: Generates ALKCTL opcode driven to ALU bitslices and
  *          implements multiply/divide state machine.
  *
@@ -103,8 +103,8 @@ module alkmdsm(
 	/* Carry inversion */
 	output carry_invert_h);
 	
-	reg tog_flag_h;
-	reg loopf_q_h;
+	reg tog_flag_h = 1'b0;
+	reg loopf_q_h = 1'b0;
 	
 	/********************************************************/
 	/* Loop flag register - Selects SETUP/LOOP cycles       */
@@ -149,11 +149,11 @@ module alkmdsm(
 	
 	/* carry output inversion */
 	assign carry_invert_h = 
-		~(  alpctl_sub_or_logic_l ) &
-		~(  alu_x0xx_l & ~alpctl_mul_l                ) &
-		~(  alu_x0xx_l & ~div_setup_cycle_l           ) &
-		~(  alu_x0xx_l & ~loopf_q_h & alpctl_divdbl_l ) &
-		~( ~tog_flag_h & ~div_loop_cycle_l            );
+		~(  alpctl_sub_or_logic_l                      ) & // CELL_06_04_INV
+		~(  alu_x0xx_l & ~alpctl_mul_l                 ) & // CELL_06_06_NAND
+		~(  alu_x0xx_l & ~div_setup_cycle_l            ) & // CELL_09_08_NAND
+		~(  alu_x0xx_l & ~loopf_q_h & ~alpctl_divdbl_l ) & // CELL_09_08_NAND
+		~( ~tog_flag_h & ~div_loop_cycle_l             );  // CELL_03_09_NAND
 	
 	/********************************************************/
 	/* ALKOP generation                                     */

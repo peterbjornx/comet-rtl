@@ -41,25 +41,29 @@ module alkcout(
 	output carry_out_l
 	);
 	
+	wire carry_out_h;
+	
 	/* Force COUT=0 for ROT modifies SP ops or if MUX forces COUT=0 */
 	wire force_cout0_h = ~(rot_modsp_l & mux_force_cout0_l);
 	wire force_cout0_l = ~force_cout0_h;
 	
 	/* Carry out multiplexer */
-	wire carry_out_h = 
+	wire cmux_l = 
 		/* ROT.ALUCI=01 (COUT=ALKC flag) */
-		~( alkc_flag_h & force_cout0_l & &(aluci_h[1:0] ^~ 2'b01) ) &
+		~( alkc_flag_h &  force_cout0_l & &(aluci_h[1:0] ^~ 2'b01) ) &
 		/* ROT.ALUCI=10 (COUT=1) */
-		~( 1'b1        & force_cout0_l & &(aluci_h[1:0] ^~ 2'b10) ) &
+		~( 1'b1        &  force_cout0_l & &(aluci_h[1:0] ^~ 2'b10) ) &
 		/* ROT.ALUCI=11 (COUT=PSL<C>) */
-		~( pslc_flag_h & force_cout0_l & &(aluci_h[1:0] ^~ 2'b11) ) &
+		~( pslc_flag_h &  force_cout0_l & &(aluci_h[1:0] ^~ 2'b11) ) &
 		/* ALPCTL=DIVDBL (COUT=ALKC flag) */
 		~( alkc_flag_h & ~alpctl_divdbl_l );
 
 	/* Selectable carry invert XOR */
-	wire carry_makelow_h = ~(carry_invert_h & carry_out_h);
-	assign carry_out_l =
+	wire carry_makelow_h = ~(carry_invert_h & cmux_l);
+	assign carry_out_h =
 		~(carry_invert_h & carry_makelow_h) &
-		~(carry_out_h & carry_makelow_h);
+		~(cmux_l & carry_makelow_h);
+
+	assign carry_out_l = ~carry_out_h;
 		
 endmodule

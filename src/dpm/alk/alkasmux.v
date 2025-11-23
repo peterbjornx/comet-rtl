@@ -122,7 +122,7 @@ module alkasmux(
 		/* Rotate, ALU SR, No Q : ALU SIO[0]     -> A SHIFT IN */
 		~( alu_sout_shr_h &  alushf_dec_rot_h &  dq_dq1_h   & alu_shr_op_h  );
 
-	wire aq_sin_pslc_l = ~(pslc_flag_h & (alushf_h ^~ 3'b111));
+	wire aq_sin_pslc_l = ~(pslc_flag_h & &(alushf_h ^~ 3'b111));
 	
 	/* Merged in WBUS[30] pad logic */
 	assign aq_sin_pslc_wb30_l = ~(

@@ -52,10 +52,10 @@ module alkqsio(
 	input  q_sio31_in_l,
 	
 	/* Q_SIO_L[] pad outputs ( open drain, polarity = pad polarity ) */
-	output q_sio0_out_l,
-	output q_sio7_out_l,
-	output q_sio15_out_l,
-	output q_sio31_out_l );
+	output reg q_sio0_out_l,
+	output reg q_sio7_out_l,
+	output reg q_sio15_out_l,
+	output reg q_sio31_out_l );
 	
 	wire alpctl_div_divdbl_l = ~(~alpctl_div_l | ~alpctl_divdbl_l );
 	
