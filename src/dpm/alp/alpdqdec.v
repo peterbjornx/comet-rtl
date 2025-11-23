@@ -39,7 +39,7 @@ module alpdqdec(
 	// Matches MUX=x1xx if not DMOVE
 	// Matches MUX=x0x0
 	assign qmux_wmux_en_h =
-		(~( dmove_l & mux_h[2]                       )) |            
+		( ( dmove_l & mux_h[2]                       )) |            
 		 &(          {mux_h[2], mux_h[0]} ^~ 2'b_0_0 ); 
 		 
 	assign qmux_onehot_h = 

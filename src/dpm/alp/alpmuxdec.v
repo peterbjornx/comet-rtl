@@ -50,7 +50,7 @@ module alpmuxdec(
 	// Matches 0000 0001 0101 1000 1001 ( RBUS )
 	assign bmux_rbus_en_h = 
 		(~&( mux_h[3:2]         ^~ 2'b11__ )) & // Inhibit if 11xx
-		(~&({mux_h[3],mux_h[0]} ^~ 2'b_1_0 )) & // Inhibit if x1x0
+		(~&({mux_h[2],mux_h[0]} ^~ 2'b_1_0 )) & // Inhibit if x1x0
 		~mux_h[1];                              // Match xx0x
 		
 	// B Mux decode: S->B
