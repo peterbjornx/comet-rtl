@@ -5,7 +5,7 @@ module sn74s112 (
     output q_h,
     output q_l );
 
-    reg q;
+    reg q = 1'b0;
 
     always @ ( negedge clk_l )
         case ( { j_h, k_h } )
