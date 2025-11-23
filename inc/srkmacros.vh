@@ -1,0 +1,21 @@
+`define PRI_EXTZ_MR  2'b00
+`define PRI_EXTZ_MM  2'b01
+`define PRI_EXTZ_RR  2'b10
+`define PRI_SECOND   2'b11
+
+`define SEC_CLR1BM   4'h00
+`define SEC_CLR2BM   4'h01
+`define SEC_LOB_OFF  4'h02
+`define SEC_CLR3BM   4'h03
+`define SEC_ASL_R    4'h04
+`define SEC_ASL_M    4'h05
+`define SEC_LITONE   4'h06
+`define SEC_LITZERO  4'h07
+`define SEC_FPFRACT  4'h08
+`define SEC_BCDSWAP  4'h09
+`define SEC_CVTPN    4'h0A
+`define SEC_FPPACK   4'h0B
+`define SEC_ASR_M    4'h0C
+`define SEC_CONST8   4'h0D
+`define SEC_CVTNP    4'h0E
+`define SEC_FPLIT    4'h0F
