@@ -1,4 +1,5 @@
 `include "alpmacros.vh"
+`include "chipmacros.vh"
 /**
  * Implements non-ALU part of data path for DC608 ALP
  * The gate netlist has been lifted to partial RTL level for this,
@@ -56,13 +57,13 @@ module alpdp(
 	
 /* Data buses */
 	wire [3:0] dreg_h;
-	reg  [3:0] qreg_h;
+	reg  [3:0] qreg_h = 4'b0000;
 	wire [3:0] amux_ld;
 
 /* Input latches */
-	reg [3:0] mbus_h;
-	reg [3:0] rbus_h;
-	reg       extdata_h;
+	reg [3:0] mbus_h = 4'b0000;
+	reg [3:0] rbus_h = 4'b0000;
+	reg       extdata_h = 1'b0;
 
 	`LATCH_N( lck_l, ~mbus_l    , mbus_h     )
 	`LATCH_N( lck_l, ~rbus_l    , rbus_h     )
@@ -77,7 +78,7 @@ module alpdp(
 			2'b01  : smux_h  = ~sbus_l[4:1];
 			2'b10  : smux_h  = ~sbus_l[5:2];
 			2'b11  : smux_h  = ~sbus_l[6:3];
-			default: amux_l  = 4'bxxxx;
+			default: smux_h = 4'bxxxx;
 		endcase
 	end
 
@@ -136,14 +137,14 @@ module alpdp(
 
 	assign q_sio_l3_oe_h  = qshl_en_h;
 	assign q_sio_l3_out_h = qreg_h[3];
-	assign qmux_shl_sin_l = ~q_sio_l3_in_h;
+	assign qmux_shr_sin_l = ~q_sio_l3_in_h;
 
 /* Q Register */
-	`FF_EN_N( qdck_l, qreg_en_h, qmux_h, qreg_h )
+	`FF_EN_P( qdck_l, qreg_en_h, qmux_h, qreg_h )
 
 /* D Register */
-	reg [3:0] dreg_l;
-	`FF_EN_N( qdck_l, dreg_en_h, wmux_l, dreg_l )
+	reg [3:0] dreg_l = 4'b0000;
+	`FF_EN_P( qdck_l, dreg_en_h, wmux_l, dreg_l )
 	assign dreg_h = ~dreg_l;
 		
 endmodule

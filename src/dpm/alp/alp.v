@@ -178,19 +178,19 @@ module dc608_alp(
 	`OPENDRAIN_DRV( wmuxz_l, 1, z_h, 1'b0 )
 	
 	/* Q SIO 0 */
-	`OPENDRAIN_DRV( q_sio_l0_oe_h, 1, q_so0_l, ~q_sio_l0_in_h )
+	`OPENDRAIN_DRV( q_sio_l0_oe_h, 1, q_so0_l, ~q_sio_l0_out_h )
 	assign q_sio_l0_in_h = ~q_si0_l;
 	
 	/* Q SIO 3 */
-	`OPENDRAIN_DRV( q_sio_l3_oe_h, 1, q_so3_l, ~q_sio_l3_in_h )
+	`OPENDRAIN_DRV( q_sio_l3_oe_h, 1, q_so3_l, ~q_sio_l3_out_h )
 	assign q_sio_l3_in_h = ~q_si3_l;
 	
 	/* A SIO 0 */
-	`OPENDRAIN_DRV( a_sio_l0_oe_h, 1, a_so0_l, ~a_sio_l0_in_h )
+	`OPENDRAIN_DRV( a_sio_l0_oe_h, 1, a_so0_l, ~a_sio_l0_out_h )
 	assign a_sio_l0_in_h = ~a_si0_l;
 	
 	/* A SIO 3 */
-	`OPENDRAIN_DRV( a_sio_l3_oe_h, 1, a_so3_l, ~a_sio_l3_in_h )
+	`OPENDRAIN_DRV( a_sio_l3_oe_h, 1, a_so3_l, ~a_sio_l3_out_h )
 	assign a_sio_l3_in_h = ~a_si0_l;
 	
 

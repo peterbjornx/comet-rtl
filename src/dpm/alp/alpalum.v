@@ -83,13 +83,13 @@ module alpalum(
 	/* WMUX */
 	always @ ( * ) begin
 		casez ( wmux_onehot_h )
-			`ALP_WMUX_NONE: wmux_l  = 4'b1111;
-			`ALP_WMUX_BCDA: wmux_l  = ~{bcda_h[3:1], aluq_h[0]};
-			`ALP_WMUX_BMUX: wmux_l  = ~bmux_h;
-			`ALP_WMUX_ASHL: wmux_l  = ~{shr_sin_h  , aluq_h[3:1]};
-			`ALP_WMUX_ASHR: wmux_l  = ~{aluq_h[2:0], shl_sin_h};
-			`ALP_WMUX_ALUQ: wmux_l  = ~aluq_h;
-			default       : wmux_l  = 4'bxxxx;
+			`ALP_WMUX_NONE: wmux_l  <= 4'b1111;
+			`ALP_WMUX_BCDA: wmux_l  <= ~{bcda_h[3:1], aluq_h[0]};
+			`ALP_WMUX_BMUX: wmux_l  <= ~bmux_h;
+			`ALP_WMUX_ASHL: wmux_l  <= ~{shr_sin_h  , aluq_h[3:1]};
+			`ALP_WMUX_ASHR: wmux_l  <= ~{aluq_h[2:0], shl_sin_h};
+			`ALP_WMUX_ALUQ: wmux_l  <= ~aluq_h;
+			default       : wmux_l  <= 4'bxxxx;
 		endcase
 	end
 
