@@ -256,7 +256,7 @@ BUT/=<47:42>,.DEFAULT=0
         NOP=0           ;NO BRANCH
         IRD1=4          ;EVALUATE OPCODE AND 1ST OPERAND OF NEXT INSTRUCTION
         IRD1TST=5       ;SAME AS IRD1 EXCEPT NEXT ADDRESS IS FROM 'NEXT'
-        IRDX=1          ;RE1URN FRCM OPERAND EVALUATION
+        IRDX=1          ;RETURN FRCM OPERAND EVALUATION
         RETURN=2        ;POP U-STK AND RET TO 'STK + NEXT'(MOD64)
         RET.DINH=3      ;POP U-STK AND RET TO 'STK + NEXT'(MOD64),DEST INH
         LOD.INC.BRA=6   ;LOAD OSR, INC IRDCNT, BRANCH ON ADD MODE
@@ -288,14 +288,14 @@ BUT/=<47:42>,.DEFAULT=0
         CCBR=2D           ;        |        |          |          | CCBR<1>      | CCBR<0>                  (NOTE 7)|
         CCBR1.CCBR0.IR0=35;        |        |          | CCBR<1>  | CCBR<0>      | .NOT.IR<0>               (NOTE 8)|
         CCBRO.SRKSTA0=36  ;        |        |          |          | CCBR<0>      | SRKSTA<0>                        |
-        D IZE=31          ;        |        |          |          | DSIZE<1>     | DSIZE<0>                (LATCHES)|
+        DSIZE=31          ;        |        |          |          | DSIZE<1>     | DSIZE<0>                (LATCHES)|
         DBZ.SC=0C         ;        |        |          |          |              | SC.EQ.0                          |
         NO.FPA=30         ;        |        |          |          |              | 0=FPA PRESENT, T=NO FPA          |
         WCSENA=27         ;        |        |          |          |              | 0=WCS PRESENT AND ENABLED        |
                           ;        |        |          |          |              | 1=WCS NOT PRESENT OR WCS DISABLED|
                           ;        |        |          |          |              |                                  |
         BR.SC-4.INT-TS=0D ;        |        |          | NOTE 3   | NOTE 3       | NOTE 3                           |
-        MM.ALL0W.INT=0B   ;        |        |          |          | NOTE 4       |                                  |
+        MM.ALLOW.INT=0B   ;        |        |          |          | NOTE 4       |                                  |
         INT-TIMSERV=2B    ;        |        |          |          | .NOT.INT     | TIMSERV                          |
         CCBR1.INT-TS=20   ;        |        |          |          | CCBR<1>      | (INT.OR.TIMSERV).AND.NOT.CCBR<1> |
                           ;        |        |          |          |              |                                  |
@@ -435,7 +435,7 @@ MISC/=<75:71>,.DEFAULT=1O                       ;DEFINE MISC FUNCTIONS
         CLR.TP=12                               ;PSL<TP> <- 0
         CLR.FPD=1C                              ;PSL<FPD> <- 0
         SET.FPD=1D                              ;PSL<FPD> <- 1
-        FORCE.TB=1F                             ;FORCE TB PARITY ERROR
+        FORCE.TB=1E                             ;FORCE TB PARITY ERROR
         FORCE.CACHE=1F                          ;FORCE CACHE PARITY ERROR
 
         DEC.SC=13                               ;STEP CNT <- STEP CNT - 1
