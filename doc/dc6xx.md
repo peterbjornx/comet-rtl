@@ -12,7 +12,7 @@ For info on the base die, see [DC600](DC600.md)
  | DC609 | ADD  | Address datapath                                  | MIC   | 4     | Tables, description            |        |                                                |           |              |
  | DC610 | CCC  | Condition Code Control                            | DPM   | 1     | Truth tables                   | Yes    | [here](https://siliconpr0n.org/map/dec/dc610/) | WIP       | behavioural  |
  | DC611 | CON  | Console UART                                      | UBI   | 2     | Description                    |        |                                                |           |              |
- | DC612 | CLA  | Carry Look-Ahead                                  | DPM   | 1     | Equations                      |        |                                                |           |              |
+ | DC612 | CLA  | Carry Look-Ahead                                  | DPM   | 1     | Equations                      | Yes    |                                                |           |              |
  | DC613 | SRM  | Shift/Rotator Multiplexer                         | DPM   | 4     | Full truth tables              | Yes    | [here](https://siliconpr0n.org/map/dec/dc613/) |           |              |
  | DC614 | SRK  | Shift/Rotator Control                             | DPM   | 1     | Full truth tables              |        |                                                |           |              |
  | DC615 | ALK  | ALU Control                                       | DPM   | 1     | Full truth tables              | Yes    | [here](https://siliconpr0n.org/map/dec/dc615/) | Completed | from netlist |
