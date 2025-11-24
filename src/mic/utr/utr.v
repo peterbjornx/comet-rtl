@@ -147,6 +147,8 @@ module dc628_utr(
     assign utrap_pend_h  =  enc_utrap_h | tb_tag_error_h | tb_miss_h | acv_perr_del_h | 
                             bus_err_utrap_h | xb1_utrap_h | xb0_utrap_h | ~do_srvc_l | latched_utrap_h;
     
+	 assign func_latch_ena_h = ~add_reg_ena_l & ~add_reg_ena_del_h;
+	 
     assign enc_utrap_h = 
         ( &(~enc_utrap_l[2:1]) ) |
         bus_utrap_ena_h & ( enc_utrap_l == 3'b000);
@@ -164,7 +166,7 @@ module dc628_utr(
     wire _dpe_d_h = tb_data_perr_h & tb_parity_ena_h;
     `LATCH_P( func_latch_ena_h, _dpe_d_h, data_perr_h )
     
-    wire _h_d_h = tb_hit_h & {2{tb_parity_ena_h}};
+    wire _h_d_h = tb_hit_h | ~{2{tb_parity_ena_h}};
     `LATCH_P( func_latch_ena_h, _h_d_h, hit_h )
 
     wire _acv_d_h = acv_h & tb_parity_ena_h;
@@ -182,6 +184,9 @@ module dc628_utr(
     assign xb0_utrap_pend_h = xb0_acv_h | ~xb0_status_h[1] | xb0_ub_unaligned_h |
         xb0_tag_1_perr_h | xb0_tag_0_perr_h | xb0_data_perr_h | xb0_mult_hit_h | xb0_tb_miss_h;
 
+    assign xb1_tb_miss_h = ~(|xb1_tb_hit_h);
+    assign xb0_tb_miss_h = ~(|xb0_tb_hit_h);
+    
     assign xb1_mult_hit_h = &xb1_tb_hit_h;
     assign xb0_mult_hit_h = &xb0_tb_hit_h;
 

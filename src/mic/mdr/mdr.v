@@ -52,7 +52,7 @@ module dc607_mdr(
     wire xbs_xb1_en_h =  xbs_h;
 	 wire are_h = ~are_l;
 	 
-	 `FF_EN_N( b_clk_l, are_h, pa_h, cmi_adr_h );
+	`FF_EN_N( b_clk_l, are_h, pa_h, cmi_adr_h )
 
     //XXX: does this involve clock?
     `LATCH_N( snapshot_cmi_l, cmi_h, cmi_data_h )
@@ -71,7 +71,7 @@ module dc607_mdr(
     wire xb_drv_h       = ~((ds_h == 2'b11) & (dr_h == 2'b00));
     
     /* WDR -> CBUS */
-    wire cbus_wdr_h;
+    wire cbus_wdr_h = cbus_sel_h; //TODO: Verify?
 
     reg cmi_ena_q_h = 1'b0;
     reg cbus_sel_h = 1'b0;
@@ -92,7 +92,7 @@ module dc607_mdr(
     wire force_cmi2d_h  = src_wdr2m_h | zero_mdr_h;
 
 
-    wire en_pa_h       = (ds_h == 2'b00 | ~are_l ) & (as_h == 2'b00);
+    wire en_pa_h       = ~((ds_h == 2'b00 | ~are_l ) & (as_h == 2'b00));
     assign pa_drv_h[0] =                    ~pa_read_h;
     assign pa_drv_h[1] = (en_pa_h | id_h) & ~pa_read_h;
     assign pa_drv_h[2] =  en_pa_h         & ~pa_read_h;
@@ -114,7 +114,7 @@ module dc607_mdr(
         endcase
     end
 
-    assign cbus_h = cbus_sel_h ? wdr_en_h : cmi_adr_h;
+    assign cbus_h = cbus_sel_h ? wdr_h : cmi_adr_h;
 
     /* XB register */
     `FF_EN_P( b_clk_l, xbs_xb0_en_h, dbus_h, xb0_h )

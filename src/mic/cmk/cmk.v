@@ -9,6 +9,11 @@
 `define CMI_FUNC_WR_UNLK  3'b101
 `define CMI_FUNC_WR_VEC   3'b110
 
+`define CMI_STATUS_NXM    2'b00
+`define CMI_STATUS_UCE    2'b01
+`define CMI_STATUS_CORR   2'b10
+`define CMI_STATUS_OK     2'b11
+
 module dc623_cmk(
     input b_clk_l,
     input d_clk_en_h,
@@ -59,7 +64,6 @@ module dc623_cmk(
     reg [1:0] latched_dsize_h = 1'b0;
     reg [31:28]  cmi_31_28_d_h = 1'b0;
     wire [31:25] cmi_d_h;
-    reg       add_reg_ena_h = 1'b0;
     reg       corr_data_int_h = 1'b0;
     wire lock_h;
     wire suppress_lock_h;
@@ -82,23 +86,17 @@ module dc623_cmk(
     wire add_cyc_h;
     reg dbbz_del_h = 1'b0;
     reg lock_set_h = 1'b0;
-    wire mem_req_h;
     reg bus_cyc_dec_h;
-    wire replacement_h;
-    reg add_ena_del_h = 1'b0;
-    reg prefetch_del_h = 1'b0;
-    wire enable_inval_h;
-    wire reset_add_ena_h;
-    reg inval_check_h = 1'b0;
-    reg inval_write_h = 1'b0;
     reg wr_vect_latch_h = 1'b0;
     reg busy_h = 1'b0;
     reg cmi_in_prog_h = 1'b0;
     reg syn_int_done_h = 1'b0;
     reg cmi_ena_h = 1'b0;
     reg int_latch_h = 1'b0;
-    reg prefetch_cycle_h = 1'b0;
 	 
+    `define CHIP_CMK
+    `include "cycseq.vh"
+
     assign add_reg_ena_l   = ~add_reg_ena_h;
     assign corr_data_int_l = ~corr_data_int_h;
 
@@ -227,12 +225,6 @@ module dc623_cmk(
 
     assign read_lock_inhibit_h = lock_set_h & latched_bus_h == `UC_BUS_READ_MOD_LCK;
 
-    /*
-	  * Whether the bus is ours to take: not HOLD, not BUSY (local or remote),
-	  * not RESET, not being arbitrated away from us and not locked.
-	  */
-    assign cmi_request_h = hold_l & dbbz_l & ~cmi_ena_h & mseq_init_l &
-         ~cmi_cpu_priority_l & ~read_lock_inhibit_h;
 
     /* Whether the current bus transaction is a read */
     wire _rd_d_h = ~prefetch_l | latched_bus_h == 5'h04 | read_dec_h;
@@ -243,8 +235,8 @@ module dc623_cmk(
 			  CMI disabled, or,
 			  Cache hit on unlocked read */
     assign inhibit_busy_h =
-			prefetch_l & ( latched_bus_h == `UC_BUS_GRANT | d_clk_en_h | m_clk_en_h ) | 
-         inhibit_cmi_h | 
+			prefetch_l & ( latched_bus_h == `UC_BUS_GRANT | ~d_clk_en_h | ~m_clk_en_h ) | 
+            inhibit_cmi_h | 
 			read_h & ~read_lock_h & hit_h;
 
     /* The BUSY flop indicates we are waiting to start a bus transaction, and is set by ARE */
@@ -255,125 +247,121 @@ module dc623_cmk(
 	 /* Latch version of BUSY H */
     wire _lb_d_h = busy_h ? ~_bs_k_h : _bs_j_h;
     `LATCH_N( b_clk_l, _lb_d_h, latched_busy_h )
+
+    
+    /*
+	  * Whether the bus is ours to take: not HOLD, not BUSY (local or remote),
+	  * not RESET, not being arbitrated away from us and not locked.
+	  */
+    assign cmi_request_h = hold_l & dbbz_l & ~cmi_ena_h & mseq_init_l &
+      ~cmi_cpu_priority_l & ~read_lock_inhibit_h;
 	 
 	 /* CMI ENA flop */
     wire _ce_j_h = cmi_request_h & set_busy_h;              // Set when SET BUSY and arbitration won
-    wire _ce_k_h = read_h | dbbz_l | mseq_init_h;           // Cleared when READ, SLAVE ACK or RESET
+    wire _ce_r_h = read_h | dbbz_l;
+    wire _ce_k_h = _ce_r_h | mseq_init_h;           // Cleared when READ, SLAVE ACK or RESET
     `JKFF_P( b_clk_l, _ce_j_h, _ce_k_h, cmi_ena_h )
 	 
 	 /* Latch version of CMI ENA H */
-    wire _cmi_en_d_h = cmi_ena_h ? (~dbbz_l & ~read_h) : _ce_j_h;
+    wire _cmi_en_d_h = cmi_ena_h ? ~_ce_r_h : _ce_j_h;
     `LATCH_N( b_clk_l, _cmi_en_d_h, cmi_enable_h )
 
-    assign set_busy_h    = cmi_ena_h & latched_busy_h;
+    assign set_busy_h    = cmi_ena_h | latched_busy_h;
     assign set_ena_cmi_h = cmi_request_h | cmi_enable_h;
-    assign ena_cmi_l     = ~(set_ena_cmi_h & set_busy_h);
+    wire   ena_cmi_h     =   set_ena_cmi_h & set_busy_h;
+    assign ena_cmi_l     = ~ena_cmi_h;
 	 
 	 /* CMI setup cycle flop, indicating this is the address/function code cycle */
-    wire _ef_d_h  = set_busy_h & set_ena_cmi_h & dbbz_l;     // Set when SET BUSY, SET ENA CMI and bus idle (first cycle)
+    wire _ef_d_h  = ena_cmi_h & dbbz_l;     // Set when SET BUSY, SET ENA CMI and bus idle (first cycle)
     `FF_P( b_clk_l, _ef_d_h , ena_func_h )
 
-	 /* CMI cycle in progress flop. */
-    wire _cip_j_h = set_busy_h & set_ena_cmi_h;            // Set by SET BUSY if 
-    wire _cip_k_h = dbbz_l | mseq_init_h;                  // Cleared by deassertion of DBBZ (slave ack)
-    `JKFF_P( b_clk_l, _cip_j_h, _cip_k_h, cmi_in_prog_h )
+	 /* CMI IN PROG H CMI cycle in progress flop. */
+    wire _cip_k_h = dbbz_l | mseq_init_h;                  // Cleared by deassertion of DBBZ (slave ack) or system reset
+    `JKFF_P( b_clk_l, ena_cmi_h, _cip_k_h, cmi_in_prog_h )
 	 
 	 /* transaction is busy and DBBZ assserted: final cycle of the CMI transaction */
     assign final_cyc_dec_h = cmi_in_prog_h & dbbz_l;
-    
-    wire _sv_d_h = (
-		( inhibit_busy_h | add_reg_ena_l ) & ( add_reg_ena_h & reset_add_ena_h | final_cyc_dec_h | timeout_h )) | 
+
+    /* STATUS VALID H indicates that the CMI cycle has ended and the CMI STATUS lines are valid  */
+    wire _cmi_end_cyc_h = final_cyc_dec_h | timeout_h;
+    wire _sv_d_h = 
+        ( add_reg_ena_l  & _cmi_end_cyc_h  ) | 
+        ( inhibit_busy_h &  add_reg_ena_h & reset_add_ena_h ) |
+        ( inhibit_busy_h & _cmi_end_cyc_h  ) |
 		mseq_init_h;
 
     `FF_P( b_clk_l, _sv_d_h, status_valid_h )
     assign status_valid_l = ~( b_clk_h & _sv_d_h | status_valid_h );
     
 	 
-	 
-
     assign grant_stall_l = ~( latched_bus_h == `UC_BUS_GRANT & 
         ((prefetch_l & busy_h & mseq_init_l) |
         (~phase_1_h & ~syn_int_done_h & ~write_vector_h & mseq_init_l )));
     
-    assign snapshot_cmi_l = ~snapshot_cmi_h;
-    assign write_vect_occ_l = ~write_vector_h;
     
 
     reg toggleflop_h;
     `FF_PRESET_P( b_clk_l, mseq_init_h, ~toggleflop_h, toggleflop_h )
-
     assign timeout_clk_h = ~b_clk_l & toggleflop_h;
+
     assign timeout_h = (~toggleflop_h) & &timeout_counter_h;
+
     wire timeout_en_h = (lock_set_h & busy_h) | (latched_bus_h == 5'h04);
     `FF_EN_P( timeout_clk_h, timeout_en_h, timeout_counter_h + 8'h01, timeout_counter_h )
 
-	 /* High if this was an incoming address cycle (cache invalidation on DMA) */
+    /* Delayed version of DBBZ signal */
+    wire _dbd_d_h = ~dbbz_l & mseq_init_l;
+    `FF_P( b_clk_l, _dbd_d_h, dbbz_del_h )
+
+	 /* High if this was an address cycle (cache invalidation on DMA) 
+        Address cycle is detected by seeing DBBZ go active
+     */
     assign add_cyc_h = ~dbbz_l & ~dbbz_del_h & mseq_init_l;
+
+    /* Abstracted out from following definitions: DMA ADD CYC H indicates a 
+       non-CPU originated address cycle is currently valid. */
+    wire dma_add_cyc_h = add_cyc_h & ~cmi_in_prog_h;
 	 
 	 /* SNAPSHOT CMI flop is set when the incoming cycle was a (DMA) write */
-    wire _sc_j_h = add_cyc_h & ~cmi_in_prog_h & cmi_h[27] & ~cmi_h[26];
+    wire _sc_j_h = dma_add_cyc_h & cmi_h[27] & ~cmi_h[26];
     wire _sc_k_h = inval_write_h | mseq_init_h;
     `JKFF_P( b_clk_h, _sc_j_h, _sc_k_h, snapshot_cmi_h )
 
-    wire _ls_j_h = add_cyc_h & ~cmi_in_prog_h & cmi_h[27:25] == `CMI_FUNC_RD_LOCK;
-    wire _ls_k_h = add_cyc_h & cmi_h[27:25] == `CMI_FUNC_WR_UNLK | mseq_init_h | timeout_h;
+    assign snapshot_cmi_l = ~snapshot_cmi_h;
+
+    /* LOCK SET H indicates that the bus is currently locked */
+    wire _ls_j_h = dma_add_cyc_h & cmi_h[27:25] == `CMI_FUNC_RD_LOCK;
+    wire _ls_k_h = add_cyc_h     & cmi_h[27:25] == `CMI_FUNC_WR_UNLK | mseq_init_h | timeout_h;
     `JKFF_P( b_clk_h, _ls_j_h, _ls_k_h, lock_set_h)
 
-    wire _st1_d_h = ~st_l[1] | ~final_cyc_dec_h;
+    /* CMI STATUS flip flops */
+    wire [1:0] _st_d_h  = ~st_l | {2{~final_cyc_dec_h}};
     wire _st1_r_h = timeout_h | ~cache_int_l & ( status_valid_h | b_clk_l );
-    `FF_PRESET_RESET_EN_P( b_clk_h, mseq_init_h, _st1_r_h, status_valid_l, _st1_d_h, status_h[1] )
-	 
-    wire _st0_d_h = ~st_l[0] | ~final_cyc_dec_h;
-    `FF_RESET_EN_P( b_clk_h, mseq_init_h, status_valid_l, _st0_d_h, status_h[0] )
+    wire _st_e_h = ~status_valid_h;
+    `FF_PRESET_RESET_EN_P( b_clk_h, mseq_init_h, _st1_r_h, _st_e_h, _st_d_h[1], status_h[1] )
+    `FF_RESET_EN_P       ( b_clk_h,             timeout_h, _st_e_h, _st_d_h[0], status_h[0] )
 
 
-    assign mem_req_h = ( prefetch_del_h | 
-        (bus_cyc_dec_h & prefetch_l & ~replacement_h)) &
-        ~busy_h & ~cmi_in_prog_h;
+    /* Latched CMI WRITE VECTOR cycle decode */
+    wire _wvl_d_h = add_cyc_h & cmi_h[27:25] == `CMI_FUNC_WR_VEC;
+    `LATCH_P( b_clk_l, _wvl_d_h, wr_vect_latch_h )
     
-    assign replacement_h = status_valid_h & ~add_ena_del_h & read_h;
-
-    //XXX: stolen from CAK as it was missing from CMK
-    `FF_PRESET_P( b_clk_l, prefetch_del_h, prefetch_del_h, prefetch_cycle_h  )
-    
-    wire _are_j_h = mem_req_h & ~inval_check_h;
-    `JKFF_P( b_clk_l, _are_j_h, reset_add_ena_h, add_reg_ena_h )
-
-    `FF_P( b_clk_l, add_reg_ena_h, add_ena_del_h )
-
-    `FF_RESET_P( b_clk_l, prefetch_l, ~prefetch_l, prefetch_del_h )
-
-    assign enable_inval_h = ~mmux_sel_s1_h & ( ~mem_req_h | add_reg_ena_h & reset_add_ena_h );
-    assign reset_add_ena_h = prefetch_cycle_h | m_clk_en_h;
-
-    wire _ivc_j_h = enable_inval_h & snapshot_cmi_h;
-    wire _ivc_k_h = snapshot_cmi_l;
-    `JKFF_P( b_clk_l, _ivc_j_h, _ivc_k_h, inval_check_h )
-
-    wire _ivw_r_h = inval_check_h;
-    `FF_RESET_P( b_clk_l, _ivw_r_h,  inval_check_h, inval_write_h )
-    wire _wv_d_h = timeout_h | wr_vect_latch_h;
+    /* WRITE VECTOR H flip flop */
+    wire _wv_d_h = timeout_h | wr_vect_latch_h; /* why does TIMEOUT H feed into here? */
     `FF_P( b_clk_l, _wv_d_h, write_vector_h )
 
-    wire _wvl_d_h = add_cyc_h & cmi_h[27] & cmi_h[26] & ~cmi_h[25];
-    `LATCH_P( b_clk_l, _wvl_d_h, wr_vect_latch_h )
+    assign write_vect_occ_l = ~write_vector_h;
 
-    wire _cdi_j_h = status_h[1] & ~status_h[0] & status_valid_h;
+    /* CORR DATA INT H indicates that data with corrected errors was received  */
+    wire _cdi_j_h = status_valid_h & status_h == `CMI_STATUS_CORR;
     `JKFF_P( b_clk_l, _cdi_j_h, m_clk_en_h, corr_data_int_h )
 
-    wire _dbd_d_h = ~dbbz_l & mseq_init_l;
-
-    `FF_P( b_clk_l, _dbd_d_h, dbbz_del_h )
-
+    /* SYN INT DONE H */
     wire _sid_d_h = ~wait_h & ~int_grant_h & int_latch_h;
     `FF_P( b_clk_l, _sid_d_h, syn_int_done_h )
 
-    always @ ( int_grant_h or phase_1_h ) begin
-        if ( int_grant_h )
-            int_latch_h <= 1'b1;
-        else if ( phase_1_h )
-            int_latch_h <= 1'b0;
-    end
+    /* INT LATCH H */
+    `RSFF( int_grant_h, phase_1_h, int_latch_h )
 
 
 

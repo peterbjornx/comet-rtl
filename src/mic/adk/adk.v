@@ -38,8 +38,6 @@ module dc626_adk(
     wire phys_dec_h;
     reg status_val_h = 1'b0;
     reg latched_bus_4_h = 1'b0;
-    reg prefetch_del_h = 1'b0;
-    reg prefetch_cyc_h = 1'b0;
     reg bus_cyc_dec_h;
     wire bus_grant_dec_h;
     wire proc_init_h;
@@ -51,19 +49,12 @@ module dc626_adk(
     wire bus_req_h;
     wire dest_va_h;
     wire full_add_h;
-    reg add_reg_ena_h = 1'b0;
-    reg add_ena_del_h = 1'b0;
-    reg inval_check_h = 1'b0;
-    wire mem_req_h;
-    wire replacement_h;
-    wire reset_add_ena_h;
     reg [3:0] sc_add_h = 4'b0;
     reg mme_h = 1'b0;
     reg wr_vect_h = 1'b0;
     reg [3:0] tb_ctl_h = 4'b0;
     reg [1:0] cur_mode_h = 2'b0;
     reg replace_0_h = 1'b0;
-    reg cyc_in_prog_h = 1'b0;
     reg read_h = 1'b0;
     wire phys_add_h;
     wire cache_cyc_h;
@@ -79,97 +70,18 @@ module dc626_adk(
 
     wire [4:0] latched_bus_h = {latched_bus_4_h, lbus_h};
 
-    `FF_RESET_P( b_clk_l, status_valid_l, ~status_valid_l, status_val_h )
 
     wire _lb4_j_h = m_clk_en_h &  bus_4_h;
     wire _lb4_k_h = m_clk_en_h & ~bus_4_h;
     `JKFF_P( b_clk_l, _lb4_j_h, _lb4_k_h, latched_bus_4_h )
 
+    `FF_RESET_P( b_clk_l, status_valid_l, ~status_valid_l, status_val_h )
+
 // ADK
+    `define CHIP_ADK
+    `include "cycseq.vh"
 
-    assign replacement_h = status_val_h & read_h & ~add_ena_del_h;
-
-    assign mem_req_h = 
-        (prefetch_del_h | ( bus_cyc_dec_h & prefetch_l & ~replacement_h)) & 
-        (add_reg_ena_h & ~cyc_in_prog_h);
-
-    /* PREFETCH DEL H - Delayed version of PREFETCH H ( clocked on posedge B CLK L ) */
-    wire _pfd_r_h = prefetch_l | proc_init_h;
-    `FF_RESET_P( b_clk_l, _pfd_r_h, ~prefetch_l, prefetch_del_h )
-
-    /* PREFETCH CYC H - Delayed version of PREFETCH DEL H ( clocked on posedge B CLK L ) */
-    `FF_PRESET_P( b_clk_l, prefetch_del_h, prefetch_del_h, prefetch_cyc_h )
-
-    wire _are_j_h = mem_req_h & ~inval_check_h;
-    assign reset_add_ena_h = prefetch_cyc_h | m_clk_en_h;
-    `JKFF_P( b_clk_l, _are_j_h, reset_add_ena_h, add_reg_ena_h )
-
-    `FF_PRESET_P( b_clk_l, add_reg_ena_h, add_reg_ena_h, add_ena_del_h )
-
-    
-    wire _cip_reset_h = status_val_h | proc_init_h;
-    always @ ( posedge add_reg_ena_h or posedge _cip_reset_h)
-        if ( _cip_reset_h )
-            cyc_in_prog_h <= 1'b0;
-        else
-            cyc_in_prog_h <= 1'b1;
-
-// CAK
-
-    assign mem_req_h =
-         (prefetch_del_h | ( bus_cyc_dec_h & prefetch_l & ~replacement_h)) & 
-        (add_reg_ena_h & ~cyc_in_prog_h);
-
-    `FF_RESET_P ( b_clk_l, prefetch_l    , prefetch_h    , prefetch_del_h )
-    `FF_PRESET_P( b_clk_l, prefetch_del_h, prefetch_del_h, prefetch_cyc_h  )
-    
-    wire _are_j_h = mem_req_h      & inval_check_l /* PRK has cyc in prog input here? */;
-    wire _are_k_h = prefetch_cyc_h | m_clk_en_h; // TODO :  check
-    `JKFF_P( b_clk_l, _are_j_h, _are_k_h, add_reg_ena_h )
-
-    `FF_PRESET_P( b_clk_l, add_reg_ena_h, add_reg_ena_h, add_ena_del_h )
-
-//PRK
-    assign mem_req_h = 
-        prefetch_del_h | ( bus_cyc_dec_h & prefetch_l & ~replacement_h);
-
-    `FF_RESET_P ( b_clk_l, prefetch_l    , prefetch_h   , prefetch_del_h )
-    `FF_PRESET_P( b_clk_l, prefetch_del_h, prefetch_del_h, prefetch_cyc_h )
-
-    assign reset_add_ena_h = prefetch_cyc_h | m_clk_en_h;
-
-    wire _are_j_h = mem_req_h & ~inval_check_h & ~cyc_in_prog_h;
-    wire _are_k_h = prefetch_cyc_h | m_clk_en_h;
-    `JKFF_P( b_clk_l, _are_j_h, _are_k_h, add_reg_ena_h )
-
-    always @ ( add_reg_ena_h or status_val_h ) begin
-        if ( add_reg_ena_h )
-            cyc_in_prog_h <= 1;
-        else if ( status_val_h )
-            cyc_in_prog_h <= 1;
-    end
-
-//CMK
-    assign mem_req_h = 
-        ( prefetch_del_h | (bus_cyc_dec_h & prefetch_l & ~replacement_h)) &
-    ~busy_h & ~cmi_in_prog_h;
-
-    assign replacement_h = ~status_valid_l & ~add_ena_del_h & read_h;
-
-    `FF_RESET_P( b_clk_l, prefetch_l, ~prefetch_l, prefetch_del_h )
-    
-    //XXX: stolen from CAK as it was missing from CMK
-    `FF_PRESET_P( b_clk_l, prefetch_del_h, prefetch_del_h, prefetch_cycle_h  )
-    
-    wire _are_j_h = mem_req_h & ~inval_check_h;
-    assign reset_add_ena_h = prefetch_cycle_h | m_clk_en_h;
-    `JKFF_P( b_clk_l, _are_j_h, reset_add_ena_h, add_reg_ena_h )
-
-    `FF_P( b_clk_l, add_reg_ena_h, add_ena_del_h )
-
-//
-
-    always @ ( latched_bus_h ) begin
+    always @ ( latched_bus_h  or dst_rmode_h ) begin
         case( latched_bus_h ) 
             `UC_BUS_READ         : bus_cyc_dec_h <= 1'b1;
             `UC_BUS_READ_PHY     : bus_cyc_dec_h <= 1'b1;
@@ -202,6 +114,7 @@ module dc626_adk(
                              latched_bus_h == `UC_BUS_WRITE_PHY;
 
     assign proc_init_h     = ~phase_1_h & latched_bus_h == `UC_BUS_PRINIT;
+
     assign write_if_not_rmode_h = ~dst_rmode_h & latched_bus_h == `UC_BUS_WRITE_NOREG;
     
     /* WRITE TB H indicates a micro order that writes the TLB */
@@ -216,6 +129,7 @@ module dc626_adk(
                          latched_bus_h == `UC_BUS_PRB_WR_PTE |   
                          latched_bus_h == `UC_BUS_PRB_RD_PTE_K;
     
+    /* BUS REQ H indicates that we are requesting the bus for a memory micro-order */
     assign bus_req_h = bus_cyc_dec_h & prefetch_l;
 
     /* DEST VA H indicates a micro order that writes the VA register */
@@ -227,7 +141,7 @@ module dc626_adk(
         wctrl_h == `UC_WCTRL_CLRTB_VA_WB |
         wctrl_h == `UC_WCTRL_CLRCH_VA_WB;
 
-    /*  */
+    /* FULL ADD H */
     assign full_add_h = 
         latched_bus_h == `UC_BUS_READ_PHY |
         latched_bus_h == `UC_BUS_WRITE_PHY |
@@ -239,15 +153,10 @@ module dc626_adk(
         latched_bus_h == `UC_BUS_PRB_RD_MODE |
         latched_bus_h == `UC_BUS_PRB_WR_MODE;
 
+    /* LATCHED HIT * H */
     `LATCH_P( phase_1_h, tb_hit_h, latched_hit_h)
-    
 
-
-
-
-    wire _ic_j_h = (~snapshot_cmi_l & ~mmux_sel_s1_h) & (
-        (add_reg_ena_h & reset_add_ena_h) | ~mem_req_h);
-    `JKFF_P( b_clk_l, _ic_j_h, snapshot_cmi_l, inval_check_h )
+    //NOTE: ADD REG ENA H and INVAL CHECK H not yet defined
 
     /* Status/Control Address Register */
     wire _scar_w_h = d_clk_en_h & wctrl_h == `UC_WCTRL_MEMSCAR_WB;
@@ -278,27 +187,18 @@ module dc626_adk(
 
     wire _r0_d_h = tb_ctl_h[3] ? ~tb_ctl_h[2] : ~replace_0_h;
     `FF_PRESET_P( b_clk_l, proc_init_h, _r0_d_h, replace_0_h )
-
-    wire _cip_reset_h = status_val_h | proc_init_h;
-    always @ ( posedge add_reg_ena_h or posedge _cip_reset_h)
-        if ( _cip_reset_h )
-            cyc_in_prog_h <= 1'b0;
-        else
-            cyc_in_prog_h <= 1'b1;
     
     wire _rd_d_h = ~prefetch_l | ~latched_bus_h[3];
     `LATCH_P( add_reg_ena_h, _rd_d_h, read_h )
 
     assign cache_cyc_h = 
-        (add_ena_del_h & ~cyc_in_prog_h) &
-        (prefetch_del_h & bus_req_h ) &
-        (add_ena_del_h & ~status_val_h & ~read_h);
+        (add_reg_ena_h | ~cyc_in_prog_h) &
+        (prefetch_del_h | bus_req_h ) &
+        (add_ena_del_h | ~status_val_h | ~read_h);
 
     assign phys_add_h = 
         ( ~inval_check_h & cache_cyc_h ) &
-        ( ~mme_h |
-          latched_bus_h == `UC_BUS_READ_PHY |
-          latched_bus_h == `UC_BUS_WRITE_PHY );
+        ( ~mme_h | phys_dec_h );
 
     wire _smr_w_h = d_clk_en_h & wctrl_h == `UC_WCTRL_MEMSCR_WB & sc_add_h == 4'b0001;
     wire _smr3_w_h = _smr_w_h | ( add_ena_del_h & read_h & latched_bus_4_h & prefetch_l );
@@ -335,31 +235,49 @@ module dc626_adk(
         ( bus_grant_dec_h & ~prefetch_del_h & ~phase_1_h ) |
         ( status_val_h & ~add_ena_del_h & read_h );
 
+    wire sdfsdfsdfsdf =
+        ( ~add_reg_ena_h | ~read_h) &
+        (  add_reg_ena_h | ~bus_cyc_dec_h ) &
+        ( ~cache_cyc_h  | ~prefetch_del_h );
+
+    /* When sdfsdfsdfsdf:
+        MBUS_WDR    : DBUS SEL=11 XB.DEC BUS
+        MDR_0       : DBUS SEL=11 XB.DEC BUS
+        MDR_IR      : DBUS SEL=11 XB.DEC BUS
+        MDR_OSR     : DBUS SEL=11 XB.DEC BUS
+
+        MDR_WB      : DBUS SEL=10 WBUS
+        TB_WB       : DBUS SEL=10 WBUS
+        CLRTB_VA_WB : DBUS SEL=10 WBUS
+        WDR_WB_UR   : DBUS SEL=10 WBUS
+        WDR_WB      : DBUS SEL=10 WBUS
+        MBUS_WDR    : DBUS SEL=10 WBUS
+       When force_dbus_cmi_h : 
+        DBUS SEL=01 CMI DATA
+       When cycle in progress, not READ and not ARE: 10 WBUS
+       When PA BUS DATA: 01 CMI DATA
+         */
+
     assign dbus_sel_h[1] = 
         pa_bus_data_h |
         ( cyc_in_prog_h & ~add_reg_ena_h & ~read_h ) |
-        ~force_dbus_cmi_h & (~add_reg_ena_h | ~read_h) &
-        ( add_reg_ena_h | ~bus_cyc_dec_h ) &
-        ( ~cache_cyc_h | ~prefetch_del_h) & (
-            wctrl_h == 6'h23 |
-            wctrl_h == 6'h26 |
-            wctrl_h == 6'h27 |
-            wctrl_h == 6'h28 |
-            wctrl_h == 6'h29 |
-            wctrl_h == 6'h2A |
-            wctrl_h == 6'h2B |
-            wctrl_h == 6'h2E |
-            wctrl_h == 6'h2F );
+        ~force_dbus_cmi_h & sdfsdfsdfsdf & (
+            wctrl_h == `UC_WCTRL_MDR_WB      |          /* MDR <- DBUS <- WBUS */
+            wctrl_h == `UC_WCTRL_TB_WB       |          /* PAD <- DBUS <- WBUS */
+            wctrl_h == `UC_WCTRL_CLRTB_VA_WB |          /* VA <- WBUS */
+            wctrl_h == `UC_WCTRL_WDR_WB_UR   |          /* WDR <- DBUS <- WBUS UN ROTATED */
+            wctrl_h == `UC_WCTRL_WDR_WB      |          /* WDR <- DBUS <- WBUS */
+            wctrl_h == `UC_WCTRL_MBUS_WDR    |          /* MBUS <- WDR */
+            wctrl_h == `UC_WCTRL_MDR_0       |          /* MDR <- DBUS <- 0 */
+            wctrl_h == `UC_WCTRL_MDR_IR      |          /* MDR <- DBUS <- DECODE BUS <- IR */
+            wctrl_h == `UC_CCPSL_MDR_OSR_CCBR_BRATST ); /* MDR <- DBUS <- DECODE BUS <- ZEROEXT OSR */
     
     assign dbus_sel_h[0] = 
-        force_dbus_cmi_h |
-        (~add_reg_ena_h | ~read_h) &
-        ( add_reg_ena_h | ~bus_cyc_dec_h ) &
-        ( ~cache_cyc_h | ~prefetch_del_h) & (
-            wctrl_h == 6'h26 |
-            wctrl_h == 6'h27 |
-            wctrl_h == 6'h2B |
-            wctrl_h == 6'h2F );
+        force_dbus_cmi_h | sdfsdfsdfsdf & (
+            wctrl_h == `UC_WCTRL_MBUS_WDR |
+            wctrl_h == `UC_WCTRL_MDR_0    |
+            wctrl_h == `UC_WCTRL_MDR_IR   |
+            wctrl_h == `UC_CCPSL_MDR_OSR_CCBR_BRATST );
     
     assign tb_hit_out_h = ~tb_ctl_h[1:0];
 
@@ -388,14 +306,14 @@ module dc626_adk(
     assign comp_mode_h  = psl_cm_h & ( ~prefetch_l | ~full_add_h ); 
     assign ena_va_l = ~(dest_va_h & d_clk_en_h );
     assign pte_check_l = ~((pte_check_h | write_tb_h) & prefetch_l);
-    assign tb_grp_wr_h[1] = 
-        ( ~inval_check_h & wctrl_h == 6'h29 ) |
-        ( d_clk_en_h & wctrl_h == 6'h28 & ( latched_hit_h[1] | (~latched_hit_h[0] & ~replace_0_h) ) );
-    assign tb_grp_wr_h[1] = 
-        ( ~inval_check_h & wctrl_h == 6'h29 ) |
-        ( d_clk_en_h & wctrl_h == 6'h28 & ( latched_hit_h[0] | (~latched_hit_h[1] &  replace_0_h) ) );
+    wire clrtb_nochk_h = ~inval_check_h & wctrl_h == `UC_WCTRL_CLRTB_VA_WB;
+    wire ena_tb_wr_h   = d_clk_en_h     & wctrl_h == `UC_WCTRL_TB_WB;
+    assign tb_grp_wr_h[1] = clrtb_nochk_h |
+        ( ena_tb_wr_h & ( latched_hit_h[1] | (~latched_hit_h[0] & ~replace_0_h) ) );
+    assign tb_grp_wr_h[0] = clrtb_nochk_h |
+        ( ena_tb_wr_h & ( latched_hit_h[0] | (~latched_hit_h[1] &  replace_0_h) ) );
     assign tb_output_ena_l = ~(
-        ~inval_check_h & ~pa_wbus_h & ~phys_add_h & ~pa_bus_data_h + // OR or AND ?
+        ~inval_check_h & ~pa_wbus_h & ~phys_add_h & ~pa_bus_data_h & // OR or AND ?
         ( add_reg_ena_h | ( dbus_sel_h == 2'b00 & ~force_dbus_cmi_h ) ) );
     assign tb_parity_ena_h = (
         mme_h & ( prefetch_del_h | (~bus_grant_dec_h & ~phys_dec_h) ) );

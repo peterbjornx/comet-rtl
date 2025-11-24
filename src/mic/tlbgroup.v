@@ -17,7 +17,7 @@ module tlbgroup(
     wire [14:0] tag_h;
     wire        tag_par_out_l;
     
-    wire        t_write_ena_h = write_h & ~b_clk_l;
+    wire        t_write_ena_l = ~(write_h & ~b_clk_l);
     assign hit_h = valid_h & ( tag_h == in_tag_h );
 
     ttagarray TAG (
@@ -26,7 +26,7 @@ module tlbgroup(
         .Dp( tag_par_in_h ),
         .Q( { valid_h, tag_h } ),
         .nQp( tag_par_out_l ),
-        .nWE( t_write_ena_h )
+        .nWE( t_write_ena_l )
     );
 
     tlbarray TLB (
@@ -35,7 +35,7 @@ module tlbgroup(
         .Dp( data_par_in_h ),
         .Q( data_out_h ),
         .Qp( data_par_out_h ),
-        .nWE( t_write_ena_h)
+        .nWE( t_write_ena_l)
     );
 
     assign tag_perr_h = ~^{ tag_par_out_l, valid_h, tag_h[14:9], ~^tag_h[8:0] }; 
